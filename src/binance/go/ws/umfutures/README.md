@@ -140,7 +140,7 @@ The test suite automatically detects available authentication methods based on e
 
 ## Test Server
 
-- **Endpoint**: `wss://ws-fapi.testnet.binance.vision/ws-fapi/v3`
+- **Endpoint**: `wss://testnet.binancefuture.com/ws-fapi/v1`
 - **Environment**: Binance Futures Testnet
 - **Risk**: No real money - safe for testing
 

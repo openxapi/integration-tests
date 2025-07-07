@@ -1,5 +1,3 @@
-//go:build ignore
-
 package wstest
 
 import (
@@ -20,6 +18,9 @@ func TestMain(m *testing.M) {
 	// Run the tests
 	code := m.Run()
 
+	// Clean up all shared clients
+	disconnectAllSharedClients()
+
 	// Print summary if running all tests
 	if testing.Verbose() {
 		printTestSummary()
@@ -30,7 +31,7 @@ func TestMain(m *testing.M) {
 
 func printTestSummary() {
 	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("📊 UMFUTURES INTEGRATION TEST SUMMARY")
+	fmt.Println("📊 UMFUTURES WEBSOCKET INTEGRATION TEST SUMMARY")
 	fmt.Println(strings.Repeat("=", 80))
 
 	configs := getTestConfigs()
@@ -45,7 +46,7 @@ func printTestSummary() {
 	fmt.Printf("  go test -v\n\n")
 
 	fmt.Printf("  # Run only public endpoint tests:\n")
-	fmt.Printf("  go test -v -run TestPing\n")
+	fmt.Printf("  go test -v -run TestTickerPrice\n")
 	fmt.Printf("  go test -v -run 'Test.*Public.*'\n\n")
 
 	fmt.Printf("  # Run tests for specific auth type:\n")
@@ -53,8 +54,8 @@ func printTestSummary() {
 	fmt.Printf("  go test -v -run 'Test.*Ed25519.*'\n\n")
 
 	fmt.Printf("  # Run specific endpoint tests:\n")
-	fmt.Printf("  go test -v -run TestSessionLogon\n")
-	fmt.Printf("  go test -v -run TestNewOrder\n")
+	fmt.Printf("  go test -v -run TestOrderPlace\n")
+	fmt.Printf("  go test -v -run TestAccountBalance\n")
 	fmt.Printf("  go test -v -run TestUserDataStream\n\n")
 
 	fmt.Printf("  # Run trading tests only:\n")
@@ -69,17 +70,16 @@ func printTestSummary() {
 	fmt.Printf("    BINANCE_RSA_API_KEY & BINANCE_RSA_PRIVATE_KEY_PATH (RSA)\n")
 	fmt.Printf("    BINANCE_ED25519_API_KEY & BINANCE_ED25519_PRIVATE_KEY_PATH (Ed25519)\n")
 	fmt.Printf("  - Tests use Binance Futures testnet for safety\n")
-	fmt.Printf("  - Some tests require specific auth types (Ed25519 for SessionLogon)\n")
-	fmt.Printf("  - Rate limiting: 200ms between requests\n")
+	fmt.Printf("  - Rate limiting: 2 seconds between connections\n")
 
 	fmt.Println(strings.Repeat("=", 80))
 }
 
 // Integration test that runs the full original test suite for comparison
 func TestFullIntegrationSuite(t *testing.T) {
-	t.Log("🚀 Running Full UMFUTURES Integration Test Suite")
+	t.Log("🚀 Running Full UMFUTURES WebSocket Integration Test Suite")
 	t.Log("================================================================================")
-	t.Log("🌐 Server: Binance Futures Testnet (wss://ws-fapi.testnet.binance.vision/ws-fapi/v3)")
+	t.Log("🌐 Server: Binance Futures Testnet (wss://testnet.binancefuture.com/ws-fapi/v1)")
 	t.Log("💡 Safe for testing - no real money at risk")
 	t.Log("================================================================================")
 
@@ -109,60 +109,33 @@ func TestFullIntegrationSuite(t *testing.T) {
 
 		// Run all test functions for this config
 		testFunctions := []struct {
-			name            string
-			fn              func(*umfuturesws.Client, TestConfig) error
-			authRequired    AuthType
-			keyTypeRequired KeyType
+			name         string
+			fn           func(*umfuturesws.Client, TestConfig) error
+			authRequired AuthType
 		}{
-			// Public tests
-			{"TickerPrice", testTickerPrice, AuthTypeNONE, KeyTypeHMAC},
-			{"BookTicker", testBookTicker, AuthTypeNONE, KeyTypeHMAC},
-			{"Depth", testDepth, AuthTypeNONE, KeyTypeHMAC},
+			// Public tests (no auth required)
+			{"TickerPrice", testTickerPrice, AuthTypeNONE},
+			{"BookTicker", testBookTicker, AuthTypeNONE},
+			{"Depth", testDepth, AuthTypeNONE},
 
-			// User data tests for HMAC
-			{"AccountBalance", testAccountBalance, AuthTypeUSER_DATA, KeyTypeHMAC},
-			{"AccountPosition", testAccountPosition, AuthTypeUSER_DATA, KeyTypeHMAC},
-			{"AccountStatus", testAccountStatus, AuthTypeUSER_DATA, KeyTypeHMAC},
-			{"V2AccountBalance", testV2AccountBalance, AuthTypeUSER_DATA, KeyTypeHMAC},
-			{"V2AccountPosition", testV2AccountPosition, AuthTypeUSER_DATA, KeyTypeHMAC},
-			{"V2AccountStatus", testV2AccountStatus, AuthTypeUSER_DATA, KeyTypeHMAC},
+			// User data tests
+			{"AccountBalance", testAccountBalance, AuthTypeUSER_DATA},
+			{"AccountPosition", testAccountPosition, AuthTypeUSER_DATA},
+			{"AccountStatus", testAccountStatus, AuthTypeUSER_DATA},
+			{"V2AccountBalance", testV2AccountBalance, AuthTypeUSER_DATA},
+			{"V2AccountPosition", testV2AccountPosition, AuthTypeUSER_DATA},
+			{"V2AccountStatus", testV2AccountStatus, AuthTypeUSER_DATA},
 
-			// Trading tests for HMAC
-			{"UserDataStreamStart", testUserDataStreamStart, AuthTypeTRADE, KeyTypeHMAC},
-			{"UserDataStreamPing", testUserDataStreamPing, AuthTypeTRADE, KeyTypeHMAC},
-			{"UserDataStreamStop", testUserDataStreamStop, AuthTypeTRADE, KeyTypeHMAC},
-			{"OrderPlace", testOrderPlace, AuthTypeTRADE, KeyTypeHMAC},
-			{"OrderStatus", testOrderStatus, AuthTypeTRADE, KeyTypeHMAC},
-			{"OrderCancel", testOrderCancel, AuthTypeTRADE, KeyTypeHMAC},
-			{"OrderModify", testOrderModify, AuthTypeTRADE, KeyTypeHMAC},
+			// User stream tests
+			{"UserDataStreamStart", testUserDataStreamStart, AuthTypeUSER_STREAM},
+			{"UserDataStreamPing", testUserDataStreamPing, AuthTypeUSER_STREAM},
+			{"UserDataStreamStop", testUserDataStreamStop, AuthTypeUSER_STREAM},
 
-			// User data tests for Ed25519
-			{"AccountBalance", testAccountBalance, AuthTypeUSER_DATA, KeyTypeED25519},
-			{"AccountPosition", testAccountPosition, AuthTypeUSER_DATA, KeyTypeED25519},
-			{"AccountStatus", testAccountStatus, AuthTypeUSER_DATA, KeyTypeED25519},
-
-			// Trading tests for Ed25519
-			{"UserDataStreamStart", testUserDataStreamStart, AuthTypeTRADE, KeyTypeED25519},
-			{"UserDataStreamPing", testUserDataStreamPing, AuthTypeTRADE, KeyTypeED25519},
-			{"UserDataStreamStop", testUserDataStreamStop, AuthTypeTRADE, KeyTypeED25519},
-			{"OrderPlace", testOrderPlace, AuthTypeTRADE, KeyTypeED25519},
-			{"OrderStatus", testOrderStatus, AuthTypeTRADE, KeyTypeED25519},
-			{"OrderCancel", testOrderCancel, AuthTypeTRADE, KeyTypeED25519},
-			{"OrderModify", testOrderModify, AuthTypeTRADE, KeyTypeED25519},
-
-			// User data tests for RSA
-			{"AccountBalance", testAccountBalance, AuthTypeUSER_DATA, KeyTypeRSA},
-			{"AccountPosition", testAccountPosition, AuthTypeUSER_DATA, KeyTypeRSA},
-			{"AccountStatus", testAccountStatus, AuthTypeUSER_DATA, KeyTypeRSA},
-
-			// Trading tests for RSA
-			{"UserDataStreamStart", testUserDataStreamStart, AuthTypeTRADE, KeyTypeRSA},
-			{"UserDataStreamPing", testUserDataStreamPing, AuthTypeTRADE, KeyTypeRSA},
-			{"UserDataStreamStop", testUserDataStreamStop, AuthTypeTRADE, KeyTypeRSA},
-			{"OrderPlace", testOrderPlace, AuthTypeTRADE, KeyTypeRSA},
-			{"OrderStatus", testOrderStatus, AuthTypeTRADE, KeyTypeRSA},
-			{"OrderCancel", testOrderCancel, AuthTypeTRADE, KeyTypeRSA},
-			{"OrderModify", testOrderModify, AuthTypeTRADE, KeyTypeRSA},
+			// Trading tests
+			{"OrderPlace", testOrderPlace, AuthTypeTRADE},
+			{"OrderStatus", testOrderStatus, AuthTypeTRADE},
+			{"OrderCancel", testOrderCancel, AuthTypeTRADE},
+			{"OrderModify", testOrderModify, AuthTypeTRADE},
 		}
 
 		client, err := setupClient(config)
@@ -172,19 +145,7 @@ func TestFullIntegrationSuite(t *testing.T) {
 
 		for _, testFunc := range testFunctions {
 			// Check if test should run for this configuration
-			shouldRun := true
-
-			// Check auth requirements
 			if testFunc.authRequired != config.AuthType {
-				shouldRun = false
-			}
-
-			// Check key type requirements
-			if testFunc.keyTypeRequired != config.KeyType {
-				shouldRun = false
-			}
-
-			if !shouldRun {
 				continue
 			}
 

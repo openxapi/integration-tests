@@ -1,5 +1,3 @@
-//go:build ignore
-
 package wstest
 
 import (
@@ -171,6 +169,15 @@ func getTestConfigs() []TestConfig {
 				SecretKey:   secretKey,
 				Description: "Test TRADE endpoints with HMAC authentication",
 			})
+
+			configs = append(configs, TestConfig{
+				Name:        "HMAC-UserStream",
+				KeyType:     KeyTypeHMAC,
+				AuthType:    AuthTypeUSER_STREAM,
+				APIKey:      apiKey,
+				SecretKey:   secretKey,
+				Description: "Test USER_STREAM endpoints with HMAC authentication",
+			})
 		}
 	}
 
@@ -194,6 +201,15 @@ func getTestConfigs() []TestConfig {
 					APIKey:      apiKey,
 					PrivateKey:  privateKeyPath,
 					Description: "Test TRADE endpoints with RSA authentication",
+				})
+
+				configs = append(configs, TestConfig{
+					Name:        "RSA-UserStream",
+					KeyType:     KeyTypeRSA,
+					AuthType:    AuthTypeUSER_STREAM,
+					APIKey:      apiKey,
+					PrivateKey:  privateKeyPath,
+					Description: "Test USER_STREAM endpoints with RSA authentication",
 				})
 			}
 		}
@@ -220,6 +236,15 @@ func getTestConfigs() []TestConfig {
 					PrivateKey:  privateKeyPath,
 					Description: "Test TRADE endpoints with Ed25519 authentication",
 				})
+
+				configs = append(configs, TestConfig{
+					Name:        "Ed25519-UserStream",
+					KeyType:     KeyTypeED25519,
+					AuthType:    AuthTypeUSER_STREAM,
+					APIKey:      apiKey,
+					PrivateKey:  privateKeyPath,
+					Description: "Test USER_STREAM endpoints with Ed25519 authentication",
+				})
 			}
 		}
 	}
@@ -232,7 +257,7 @@ func setupClient(config TestConfig) (*umfuturesws.Client, error) {
 	client := umfuturesws.NewClient()
 
 	// Set to testnet server
-	err := client.SetActiveServer("testnet")
+	err := client.SetActiveServer("testnet1")
 	if err != nil {
 		return nil, fmt.Errorf("failed to set testnet server: %w", err)
 	}
@@ -250,6 +275,10 @@ func setupClient(config TestConfig) (*umfuturesws.Client, error) {
 		}
 		client.SetAuth(auth)
 	}
+
+	// Note: Unlike spot, umfutures uses a generic event handler system
+	// No specific handler methods like HandleEventStreamTerminated are available
+	// Events would be registered using client.eventHandler.RegisterHandler if needed
 
 	// Connect to the WebSocket server
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -337,6 +366,9 @@ func getOrCreateSharedClient(t *testing.T, config TestConfig) *umfuturesws.Clien
 	}
 
 	sharedClients.clients[config.Name] = newClient
+
+	// Don't register cleanup here - let TestMain handle it
+	// This prevents premature disconnection during subtests
 
 	return newClient
 }
