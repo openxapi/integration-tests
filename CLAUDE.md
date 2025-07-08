@@ -119,3 +119,13 @@ When resuming work on REST API integration tests:
 - Include proper rate limiting between API calls
 - Test all authentication methods when applicable (HMAC, RSA, Ed25519)
 - Verify response structures thoroughly
+
+## New Module Integration Test Development
+
+When writing integration tests for a new module:
+
+1. **List All SDK APIs**: Before writing any tests, create a comprehensive list of all APIs available in the SDK for the specific module
+2. **Document the API List**: Write down this API list in the module's directory (e.g., in API_COVERAGE.md)
+3. **Aim for 100% Coverage**: Write integration tests to cover 100% of the API list
+4. **Update Progress**: Update the API list each time you finish work, marking which APIs have been tested
+5. **Track Continuation**: This allows you or others to easily continue the work by seeing exactly what remains to be tested
