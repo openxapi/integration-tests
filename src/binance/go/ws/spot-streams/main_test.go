@@ -52,6 +52,8 @@ func printTestSummary() {
 	fmt.Printf("  go test -v -run TestTradeStream\n")
 	fmt.Printf("  go test -v -run TestKlineStream\n")
 	fmt.Printf("  go test -v -run TestDepthStream\n")
+	fmt.Printf("  go test -v -run TestDepthStreamUpdateSpeed\n")
+	fmt.Printf("  go test -v -run TestPartialDepthStreamUpdateSpeed\n")
 	fmt.Printf("  go test -v -run TestMultipleStreamTypes\n\n")
 
 	fmt.Printf("  # Run connection tests:\n")
@@ -107,6 +109,10 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Depth stream tests
 		{"DepthStream", TestDepthStream, true},
 		{"PartialDepthStream", TestPartialDepthStream, true},
+		{"DifferentDepthLevels", TestDifferentDepthLevels, true},
+		{"DepthStreamUpdateSpeed", TestDepthStreamUpdateSpeed, true},
+		{"PartialDepthStreamUpdateSpeed", TestPartialDepthStreamUpdateSpeed, true},
+		{"DepthStreamSpeedComparison", TestDepthStreamSpeedComparison, false},
 
 		// Advanced stream tests
 		{"RollingWindowTickerStream", TestRollingWindowTickerStream, false},

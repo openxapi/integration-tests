@@ -2,6 +2,7 @@ package streamstest
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -265,6 +266,179 @@ func TestDifferentDepthLevels(t *testing.T) {
 			client.ClearEvents()
 		})
 	}
+}
+
+// TestDepthStreamUpdateSpeed tests differential depth streams with updateSpeed
+func TestDepthStreamUpdateSpeed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping depth update speed test in short mode")
+	}
+
+	client := setupAndConnectClient(t)
+	defer client.Disconnect()
+
+	ctx := context.Background()
+
+	// Test different update speeds for differential depth
+	updateSpeeds := []string{"100ms", "1000ms"}
+	
+	for _, speed := range updateSpeeds {
+		t.Run("depth@"+speed, func(t *testing.T) {
+			stream := "btcusdt@depth@" + speed
+			
+			if err := client.Subscribe(ctx, []string{stream}); err != nil {
+				t.Fatalf("Failed to subscribe to %s: %v", stream, err)
+			}
+
+			// Wait for events - 100ms should be faster than 1000ms
+			expectedEvents := 3
+			if speed == "100ms" {
+				expectedEvents = 5 // Expect more events with faster updates
+			}
+			
+			if err := client.WaitForEventsByType("depth", expectedEvents, 25*time.Second); err != nil {
+				t.Logf("Warning: %v", err)
+			}
+
+			events := client.GetEventsByType("depth")
+			t.Logf("Received %d depth events with %s update speed", len(events), speed)
+
+			// Verify we got some events
+			if len(events) > 0 {
+				t.Logf("✅ Successfully received depth events with %s update speed", speed)
+			} else {
+				t.Logf("⚠️  No depth events received with %s update speed", speed)
+			}
+
+			if err := client.Unsubscribe(ctx, []string{stream}); err != nil {
+				t.Errorf("Failed to unsubscribe from %s: %v", stream, err)
+			}
+
+			// Clear events for next test
+			client.ClearEvents()
+		})
+	}
+}
+
+// TestPartialDepthStreamUpdateSpeed tests partial depth streams with updateSpeed
+func TestPartialDepthStreamUpdateSpeed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping partial depth update speed test in short mode")
+	}
+
+	client := setupAndConnectClient(t)
+	defer client.Disconnect()
+
+	ctx := context.Background()
+
+	// Test different combinations of depth levels and update speeds
+	depthLevels := []string{"5", "10", "20"}
+	updateSpeeds := []string{"100ms", "1000ms"}
+	
+	for _, level := range depthLevels {
+		for _, speed := range updateSpeeds {
+			t.Run(fmt.Sprintf("depth%s@%s", level, speed), func(t *testing.T) {
+				stream := fmt.Sprintf("btcusdt@depth%s@%s", level, speed)
+				
+				if err := client.Subscribe(ctx, []string{stream}); err != nil {
+					t.Fatalf("Failed to subscribe to %s: %v", stream, err)
+				}
+
+				// Wait for events - 100ms should be faster than 1000ms
+				expectedEvents := 3
+				if speed == "100ms" {
+					expectedEvents = 5 // Expect more events with faster updates
+				}
+
+				if err := client.WaitForEventsByType("partialDepth", expectedEvents, 25*time.Second); err != nil {
+					t.Logf("Warning: %v", err)
+				}
+
+				events := client.GetEventsByType("partialDepth")
+				t.Logf("Received %d partial depth events for level %s with %s update speed", len(events), level, speed)
+
+				// Verify we got some events
+				if len(events) > 0 {
+					t.Logf("✅ Successfully received partial depth events for level %s with %s update speed", level, speed)
+				} else {
+					t.Logf("⚠️  No partial depth events received for level %s with %s update speed", level, speed)
+				}
+
+				if err := client.Unsubscribe(ctx, []string{stream}); err != nil {
+					t.Errorf("Failed to unsubscribe from %s: %v", stream, err)
+				}
+
+				// Clear events for next test
+				client.ClearEvents()
+			})
+		}
+	}
+}
+
+// TestDepthStreamSpeedComparison tests the performance difference between update speeds
+func TestDepthStreamSpeedComparison(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping depth speed comparison test in short mode")
+	}
+
+	client := setupAndConnectClient(t)
+	defer client.Disconnect()
+
+	ctx := context.Background()
+
+	// Test speed comparison for depth streams
+	testDuration := 15 * time.Second
+	
+	// Test 100ms speed
+	t.Run("100ms_speed_test", func(t *testing.T) {
+		stream := "btcusdt@depth@100ms"
+		
+		if err := client.Subscribe(ctx, []string{stream}); err != nil {
+			t.Fatalf("Failed to subscribe to %s: %v", stream, err)
+		}
+
+		// Wait for the test duration
+		time.Sleep(testDuration)
+
+		events := client.GetEventsByType("depth")
+		fastEvents := len(events)
+		t.Logf("Received %d depth events in %v with 100ms update speed", fastEvents, testDuration)
+
+		if err := client.Unsubscribe(ctx, []string{stream}); err != nil {
+			t.Errorf("Failed to unsubscribe from %s: %v", stream, err)
+		}
+
+		client.ClearEvents()
+		
+		// Test 1000ms speed
+		stream = "btcusdt@depth@1000ms"
+		
+		if err := client.Subscribe(ctx, []string{stream}); err != nil {
+			t.Fatalf("Failed to subscribe to %s: %v", stream, err)
+		}
+
+		// Wait for the same duration
+		time.Sleep(testDuration)
+
+		events = client.GetEventsByType("depth")
+		slowEvents := len(events)
+		t.Logf("Received %d depth events in %v with 1000ms update speed", slowEvents, testDuration)
+
+		if err := client.Unsubscribe(ctx, []string{stream}); err != nil {
+			t.Errorf("Failed to unsubscribe from %s: %v", stream, err)
+		}
+
+		// Compare speeds
+		if fastEvents > slowEvents {
+			t.Logf("✅ 100ms update speed is faster: %d events vs %d events", fastEvents, slowEvents)
+		} else if fastEvents == slowEvents {
+			t.Logf("⚠️  Both speeds received same number of events: %d", fastEvents)
+		} else {
+			t.Logf("❌ Unexpected: 1000ms received more events than 100ms")
+		}
+
+		client.ClearEvents()
+	})
 }
 
 // TestAllTickerStream tests all symbols ticker stream

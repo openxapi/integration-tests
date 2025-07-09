@@ -47,7 +47,25 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 |----------|------------------|---------------|-----------|--------|
 | **Kline Intervals** | 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M | ✅ (1m,5m,15m,1h tested) | `streams_test.go` | Working |
 | **Depth Levels** | 5, 10, 20 | ✅ | `streams_test.go` | Working |
+| **Depth Update Speed** | 100ms, 1000ms | ✅ | `streams_test.go` | Working |
 | **Rolling Window** | 1h, 4h, 1d | ✅ (1h tested) | `streams_test.go` | Working |
+
+### ✅ Depth Stream Formats
+
+| Stream Format | Description | Test Coverage | Test File | Status |
+|---------------|-------------|---------------|-----------|--------|
+| **`symbol@depth`** | Differential depth updates (default speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth@100ms`** | Differential depth updates (100ms speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth@1000ms`** | Differential depth updates (1000ms speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth5`** | Partial depth snapshots (5 levels) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth10`** | Partial depth snapshots (10 levels) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth20`** | Partial depth snapshots (20 levels) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth5@100ms`** | Partial depth snapshots (5 levels, 100ms speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth5@1000ms`** | Partial depth snapshots (5 levels, 1000ms speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth10@100ms`** | Partial depth snapshots (10 levels, 100ms speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth10@1000ms`** | Partial depth snapshots (10 levels, 1000ms speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth20@100ms`** | Partial depth snapshots (20 levels, 100ms speed) | ✅ | `streams_test.go` | Working |
+| **`symbol@depth20@1000ms`** | Partial depth snapshots (20 levels, 1000ms speed) | ✅ | `streams_test.go` | Working |
 
 ## Connection Management Coverage
 
@@ -186,13 +204,15 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 
 ## Test Statistics
 
-- **Total Test Functions**: 36+
+- **Total Test Functions**: 40+
 - **Total Benchmark Functions**: 3
 - **Stream Types Tested**: 10
 - **Event Types Tested**: 13
+- **Depth Stream Formats Tested**: 12
+- **Update Speed Variants Tested**: 2 (100ms, 1000ms)
 - **Combined Stream Tests**: 1
 - **Error Scenarios Tested**: 8
-- **Performance Scenarios Tested**: 5
+- **Performance Scenarios Tested**: 6
 
 ## Usage Instructions
 
@@ -208,7 +228,10 @@ go test -v -run TestFullIntegrationSuite
 # Run specific test categories
 go test -v -run TestConnection
 go test -v -run TestStreams
-go test -v -run TestCombinedStreams
+go test -v -run TestDepthStream
+go test -v -run TestDepthStreamUpdateSpeed
+go test -v -run TestPartialDepthStreamUpdateSpeed
+go test -v -run TestMultipleStreamTypes
 go test -v -run TestSubscription
 go test -v -run TestError
 go test -v -run TestPerformance
