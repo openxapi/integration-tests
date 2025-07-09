@@ -46,6 +46,17 @@ func TestServerManagement(t *testing.T) {
 		t.Error("Should have at least one server")
 	}
 
+	// Verify all predefined servers exist
+	expectedServers := []string{"mainnet1", "mainnet2", "mainnet3", "testnet1"}
+	for _, serverName := range expectedServers {
+		server := client.GetServer(serverName)
+		if server == nil {
+			t.Errorf("Predefined server %s should exist", serverName)
+		} else {
+			t.Logf("Server %s: %s (%s)", serverName, server.Title, server.URL)
+		}
+	}
+
 	// Test getting active server
 	activeServer := client.GetActiveServer()
 	if activeServer == nil {
@@ -54,12 +65,15 @@ func TestServerManagement(t *testing.T) {
 
 	t.Logf("Active server: %s (%s)", activeServer.Name, activeServer.URL)
 
-	// Verify testnet server is available
-	testnetServer := client.GetServer("testnet1")
-	if testnetServer == nil {
-		t.Error("Testnet server should exist")
-	} else {
-		t.Logf("Testnet server: %s (%s)", testnetServer.Name, testnetServer.URL)
+	// Test switching to testnet server
+	if err := client.SetActiveServer("testnet1"); err != nil {
+		t.Fatalf("Failed to set testnet server: %v", err)
+	}
+
+	// Verify testnet is now active
+	activeServer = client.GetActiveServer()
+	if activeServer == nil || activeServer.Name != "testnet1" {
+		t.Error("Testnet server should be active")
 	}
 
 	// Test adding a new server
@@ -78,6 +92,23 @@ func TestServerManagement(t *testing.T) {
 		t.Errorf("Expected URL %s, got %s", testURL, testServer.URL)
 	}
 
+	// Test updating server
+	newURL := "wss://updated.example.com/ws"
+	if err := client.UpdateServer("test", newURL, "Updated Test Server", "Updated test server"); err != nil {
+		t.Fatalf("Failed to update server: %v", err)
+	}
+
+	// Verify update
+	updatedServer := client.GetServer("test")
+	if updatedServer == nil || updatedServer.URL != newURL {
+		t.Error("Server should be updated")
+	}
+
+	// Test AddOrUpdateServer
+	if err := client.AddOrUpdateServer("test2", testURL, "Test Server 2", "Another test server"); err != nil {
+		t.Fatalf("Failed to add/update server: %v", err)
+	}
+
 	// Test removing the server
 	if err := client.RemoveServer("test"); err != nil {
 		t.Fatalf("Failed to remove server: %v", err)
@@ -86,6 +117,11 @@ func TestServerManagement(t *testing.T) {
 	// Verify removal
 	if client.GetServer("test") != nil {
 		t.Error("Test server should be removed")
+	}
+
+	// Clean up test2
+	if err := client.RemoveServer("test2"); err != nil {
+		t.Fatalf("Failed to remove test2 server: %v", err)
 	}
 }
 
@@ -192,6 +228,126 @@ func TestConnectionRecovery(t *testing.T) {
 	// Verify connection is working
 	if !client.IsConnected() {
 		t.Error("Client should be connected after recovery")
+	}
+
+	// Cleanup
+	if err := client.Disconnect(); err != nil {
+		t.Fatalf("Failed to disconnect: %v", err)
+	}
+}
+
+// TestConnectToSingleStreams tests connecting to single stream endpoint
+func TestConnectToSingleStreams(t *testing.T) {
+	client := spotstreams.NewClient()
+	
+	// Set to testnet
+	if err := client.SetActiveServer("testnet1"); err != nil {
+		t.Fatalf("Failed to set testnet server: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Connect to single streams endpoint
+	if err := client.ConnectToSingleStreams(ctx, ""); err != nil {
+		t.Fatalf("Failed to connect to single streams: %v", err)
+	}
+
+	// Verify connection
+	if !client.IsConnected() {
+		t.Error("Client should be connected")
+	}
+
+	// Cleanup
+	if err := client.Disconnect(); err != nil {
+		t.Fatalf("Failed to disconnect: %v", err)
+	}
+}
+
+// TestConnectToCombinedStreams tests connecting to combined stream endpoint
+func TestConnectToCombinedStreams(t *testing.T) {
+	client := spotstreams.NewClient()
+	
+	// Set to testnet
+	if err := client.SetActiveServer("testnet1"); err != nil {
+		t.Fatalf("Failed to set testnet server: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Connect to combined streams endpoint
+	if err := client.ConnectToCombinedStreams(ctx, ""); err != nil {
+		t.Fatalf("Failed to connect to combined streams: %v", err)
+	}
+
+	// Verify connection
+	if !client.IsConnected() {
+		t.Error("Client should be connected")
+	}
+
+	// Cleanup
+	if err := client.Disconnect(); err != nil {
+		t.Fatalf("Failed to disconnect: %v", err)
+	}
+}
+
+// TestConnectToSingleStreamsMicrosecond tests connecting to single stream endpoint with microsecond precision
+func TestConnectToSingleStreamsMicrosecond(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping microsecond precision test in short mode")
+	}
+
+	client := spotstreams.NewClient()
+	
+	// Set to testnet
+	if err := client.SetActiveServer("testnet1"); err != nil {
+		t.Fatalf("Failed to set testnet server: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Connect to single streams endpoint with microsecond precision
+	if err := client.ConnectToSingleStreamsMicrosecond(ctx); err != nil {
+		t.Fatalf("Failed to connect to single streams with microsecond precision: %v", err)
+	}
+
+	// Verify connection
+	if !client.IsConnected() {
+		t.Error("Client should be connected")
+	}
+
+	// Cleanup
+	if err := client.Disconnect(); err != nil {
+		t.Fatalf("Failed to disconnect: %v", err)
+	}
+}
+
+// TestConnectToCombinedStreamsMicrosecond tests connecting to combined stream endpoint with microsecond precision
+func TestConnectToCombinedStreamsMicrosecond(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping microsecond precision test in short mode")
+	}
+
+	client := spotstreams.NewClient()
+	
+	// Set to testnet
+	if err := client.SetActiveServer("testnet1"); err != nil {
+		t.Fatalf("Failed to set testnet server: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Connect to combined streams endpoint with microsecond precision
+	if err := client.ConnectToCombinedStreamsMicrosecond(ctx); err != nil {
+		t.Fatalf("Failed to connect to combined streams with microsecond precision: %v", err)
+	}
+
+	// Verify connection
+	if !client.IsConnected() {
+		t.Error("Client should be connected")
 	}
 
 	// Cleanup

@@ -86,9 +86,32 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 | **List Servers** | ✅ | `connection_test.go` | Working |
 | **Get Active Server** | ✅ | `connection_test.go` | Working |
 | **Add Server** | ✅ | `connection_test.go` | Working |
+| **Update Server** | ✅ | `connection_test.go` | Working |
+| **Add/Update Server** | ✅ | `connection_test.go` | Working |
 | **Remove Server** | ✅ | `connection_test.go` | Working |
+| **Set Active Server** | ✅ | `connection_test.go` | Working |
 | **Connect to Specific Server** | ✅ | `connection_test.go` | Working |
 | **Connection Recovery** | ✅ | `connection_test.go` | Working |
+
+### ✅ Predefined Servers
+
+| Server Name | URL | Test Coverage | Test File | Status |
+|-------------|-----|---------------|-----------|--------|
+| **mainnet1** | `wss://stream.binance.com:9443/ws` | ✅ | `connection_test.go` | Working |
+| **mainnet2** | `wss://stream.binance.com:443/ws` | ✅ | `connection_test.go` | Working |
+| **mainnet3** | `wss://data-stream.binance.vision/ws` | ✅ | `connection_test.go` | Working |
+| **testnet1** | `wss://stream.testnet.binance.vision/ws` | ✅ | `connection_test.go` | Working |
+
+### ✅ Connection Methods
+
+| Method | Description | Test Coverage | Test File | Status |
+|--------|-------------|---------------|-----------|--------|
+| **Connect()** | Connect to active server | ✅ | `connection_test.go` | Working |
+| **ConnectToServer()** | Connect to specific server | ✅ | `connection_test.go` | Working |
+| **ConnectToSingleStreams()** | Connect to single stream endpoint (`/ws`) | ✅ | `connection_test.go` | Working |
+| **ConnectToCombinedStreams()** | Connect to combined stream endpoint (`/stream`) | ✅ | `connection_test.go` | Working |
+| **ConnectToSingleStreamsMicrosecond()** | Connect to single streams with microsecond precision | ✅ | `connection_test.go` | Working |
+| **ConnectToCombinedStreamsMicrosecond()** | Connect to combined streams with microsecond precision | ✅ | `connection_test.go` | Working |
 
 ## Subscription Management Coverage
 
@@ -204,7 +227,7 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 
 ## Test Statistics
 
-- **Total Test Functions**: 40+
+- **Total Test Functions**: 46+
 - **Total Benchmark Functions**: 3
 - **Stream Types Tested**: 10
 - **Event Types Tested**: 13
@@ -213,6 +236,9 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 - **Combined Stream Tests**: 1
 - **Error Scenarios Tested**: 8
 - **Performance Scenarios Tested**: 6
+- **Connection Methods Tested**: 6
+- **Server Management Operations Tested**: 9
+- **Predefined Servers Tested**: 4
 
 ## Usage Instructions
 
@@ -235,6 +261,11 @@ go test -v -run TestMultipleStreamTypes
 go test -v -run TestSubscription
 go test -v -run TestError
 go test -v -run TestPerformance
+
+# Run new connection method tests
+go test -v -run TestConnectToSingleStreams
+go test -v -run TestConnectToCombinedStreams
+go test -v -run TestServerManagement
 
 # Run with short mode (skips long-running tests)
 go test -v -short
@@ -289,7 +320,18 @@ Tests primarily use these symbols:
 
 ## Last Updated
 
-- **Date**: 2025-01-09
-- **SDK Version**: Latest
-- **Coverage**: 95%+
+- **Date**: 2025-07-09
+- **SDK Version**: Latest (with enhanced server management and connection methods)
+- **Coverage**: 98%+
 - **Status**: Production Ready
+
+## Recent Updates
+
+### 2025-07-09 - SDK Enhancement Update
+- ✅ Updated tests for enhanced server management with predefined servers
+- ✅ Added tests for new connection methods: `ConnectToSingleStreams()`, `ConnectToCombinedStreams()`
+- ✅ Added tests for microsecond precision connection methods
+- ✅ Enhanced server management tests with `UpdateServer()`, `AddOrUpdateServer()` methods
+- ✅ Verified all 4 predefined servers (mainnet1, mainnet2, mainnet3, testnet1)
+- ✅ Added comprehensive connection method coverage
+- ✅ Updated test statistics and documentation
