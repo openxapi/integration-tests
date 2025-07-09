@@ -128,6 +128,13 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"ErrorHandling", TestErrorHandling, true},
 		{"InvalidStreamNames", TestInvalidStreamNames, true},
 
+		// Combined streams tests
+		{"CombinedStreamEventReception", TestCombinedStreamEventReception, true},
+		{"CombinedStreamEventDataTypes", TestCombinedStreamEventDataTypes, true},
+		{"CombinedStreamMicrosecondPrecision", TestCombinedStreamMicrosecondPrecision, false},
+		{"SingleVsCombinedStreamComparison", TestSingleVsCombinedStreamComparison, false},
+		{"CombinedStreamSubscriptionManagement", TestCombinedStreamSubscriptionManagement, true},
+
 		// Performance tests
 		{"ConcurrentStreams", TestConcurrentStreams, false},
 		{"HighVolumeStreams", TestHighVolumeStreams, false},

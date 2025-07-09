@@ -28,6 +28,35 @@ func TestErrorHandling(t *testing.T) {
 				return // Skip empty stream test
 			}
 			
+			// Check if underlying client is connected before attempting subscription
+			if !client.client.IsConnected() {
+				t.Logf("Client disconnected, reconnecting before testing: %s", invalidStream)
+				
+				// Force wrapper state to disconnected to allow reconnection
+				client.mu.Lock()
+				client.connected = false
+				client.mu.Unlock()
+				
+				// Disconnect first to clean up any stale connections
+				if err := client.Disconnect(); err != nil {
+					t.Logf("Warning: Failed to disconnect client: %v", err)
+				}
+				
+				// Create a new context with timeout for reconnection
+				reconnectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				
+				if err := client.Connect(reconnectCtx); err != nil {
+					t.Fatalf("Failed to reconnect client: %v", err)
+				}
+				
+				// Set up event handlers again after reconnection
+				client.SetupEventHandlers()
+				
+				// Wait a moment for connection to stabilize
+				time.Sleep(500 * time.Millisecond)
+			}
+			
 			err := client.Subscribe(ctx, []string{invalidStream})
 			// The subscription might not fail immediately at the client level
 			// but we should check for error events
@@ -63,7 +92,7 @@ func TestInvalidStreamNames(t *testing.T) {
 		"btcusdt@TRADE",        // Uppercase stream type
 		"btc_usdt@trade",       // Invalid symbol format
 		"btcusdt@trade@extra",  // Extra parts
-		"btcusdt trade",        // Missing @
+		"btcusdt trade",        // Missing @ (causes connection close)
 		"btcusdt@@trade",       // Double @
 		"btcusdt@kline_",       // Missing interval
 		"btcusdt@kline_999m",   // Invalid interval
@@ -72,6 +101,35 @@ func TestInvalidStreamNames(t *testing.T) {
 
 	for _, invalidStream := range invalidStreamFormats {
 		t.Run("format_test_"+invalidStream, func(t *testing.T) {
+			// Check if underlying client is connected before attempting subscription
+			if !client.client.IsConnected() {
+				t.Logf("Client disconnected, reconnecting before testing: %s", invalidStream)
+				
+				// Force wrapper state to disconnected to allow reconnection
+				client.mu.Lock()
+				client.connected = false
+				client.mu.Unlock()
+				
+				// Disconnect first to clean up any stale connections
+				if err := client.Disconnect(); err != nil {
+					t.Logf("Warning: Failed to disconnect client: %v", err)
+				}
+				
+				// Create a new context with timeout for reconnection
+				reconnectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				
+				if err := client.Connect(reconnectCtx); err != nil {
+					t.Fatalf("Failed to reconnect client: %v", err)
+				}
+				
+				// Set up event handlers again after reconnection
+				client.SetupEventHandlers()
+				
+				// Wait a moment for connection to stabilize
+				time.Sleep(500 * time.Millisecond)
+			}
+
 			err := client.Subscribe(ctx, []string{invalidStream})
 			
 			// Log the attempt
