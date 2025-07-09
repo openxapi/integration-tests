@@ -37,7 +37,9 @@ Where:
 3. **SDK Location**: The actual SDK code being tested is located relative to the integration test folder:
    - For `@src/binance/go/ws/spot`, the SDK is at `../binance-go/ws/spot`
    - For `@src/binance/go/ws/umfutures`, the SDK is at `../binance-go/ws/umfutures`
+   - For `@src/binance/go/ws/spot-streams`, the SDK is at `../binance-go/ws/spot-streams`
    - **Never modify SDK files** - only create and update integration test files
+   - **SDK Issues**: If you find any issues with the SDK, report them instead of modifying SDK code
 
 4. **Test Implementation**: When implementing tests:
    - Read and understand the SDK code structure first

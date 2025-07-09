@@ -51,7 +51,8 @@ func printTestSummary() {
 	fmt.Printf("  # Run specific stream tests:\n")
 	fmt.Printf("  go test -v -run TestTradeStream\n")
 	fmt.Printf("  go test -v -run TestKlineStream\n")
-	fmt.Printf("  go test -v -run TestDepthStream\n\n")
+	fmt.Printf("  go test -v -run TestDepthStream\n")
+	fmt.Printf("  go test -v -run TestMultipleStreamTypes\n\n")
 
 	fmt.Printf("  # Run connection tests:\n")
 	fmt.Printf("  go test -v -run TestConnection\n\n")
@@ -110,6 +111,7 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Advanced stream tests
 		{"RollingWindowTickerStream", TestRollingWindowTickerStream, false},
 		{"AvgPriceStream", TestAvgPriceStream, false},
+		{"MultipleStreamTypes", TestMultipleStreamTypes, true},
 
 		// Subscription management tests
 		{"SubscriptionManagement", TestSubscriptionManagement, true},

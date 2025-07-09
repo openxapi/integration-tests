@@ -34,6 +34,13 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 | **All Symbols Mini Ticker** | `!miniTicker@arr` | ✅ | `streams_test.go` | Working |
 | **All Symbols Book Ticker** | `!bookTicker` | ✅ | `streams_test.go` | Working |
 
+### ✅ Combined Streams
+
+| Stream Type | Format | Test Coverage | Test File | Status |
+|-------------|--------|---------------|-----------|--------|
+| **Combined Multi-Stream** | Multiple streams subscription | ✅ | `streams_test.go` | Working |
+| **Combined Event Processing** | Mixed stream types processing | ✅ | `streams_test.go` | Working |
+
 ### ✅ Stream Intervals & Depth Levels
 
 | Category | Supported Values | Test Coverage | Test File | Status |
@@ -179,10 +186,11 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 
 ## Test Statistics
 
-- **Total Test Functions**: 35+
+- **Total Test Functions**: 36+
 - **Total Benchmark Functions**: 3
 - **Stream Types Tested**: 10
 - **Event Types Tested**: 13
+- **Combined Stream Tests**: 1
 - **Error Scenarios Tested**: 8
 - **Performance Scenarios Tested**: 5
 
@@ -200,6 +208,7 @@ go test -v -run TestFullIntegrationSuite
 # Run specific test categories
 go test -v -run TestConnection
 go test -v -run TestStreams
+go test -v -run TestCombinedStreams
 go test -v -run TestSubscription
 go test -v -run TestError
 go test -v -run TestPerformance
