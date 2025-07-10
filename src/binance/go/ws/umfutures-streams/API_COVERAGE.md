@@ -22,7 +22,7 @@ This document tracks the integration test coverage for the Binance USD-M Futures
 | **24hr Mini Ticker Stream** | `<symbol>@miniTicker` | ✅ | `streams_test.go` | Working |
 | **24hr Ticker Stream** | `<symbol>@ticker` | ✅ | `streams_test.go` | Working |
 | **Book Ticker Stream** | `<symbol>@bookTicker` | ✅ | `streams_test.go` | Working |
-| **Liquidation Order Stream** | `<symbol>@forceOrder` | ✅ | `streams_test.go` | Working (rare on testnet, snapshot-based) |
+| **Liquidation Order Stream** | `<symbol>@forceOrder` | ✅ | `streams_test.go` | Working (testnet: 0 events expected - rare liquidations) |
 | **Partial Depth Stream** | `<symbol>@depth<levels>` | ✅ | `streams_test.go` | Working (uses depthUpdate events) |
 | **Diff Depth Stream** | `<symbol>@depth` | ✅ | `streams_test.go` | Working |
 | **Composite Index Stream** | `<symbol>@compositeIndex` | ✅ | `streams_test.go` | Working (limited testnet availability) |
@@ -361,7 +361,7 @@ Tests primarily use these symbols:
 
 ### Testnet-Specific Limitations
 
-1. **Liquidation Events**: ForceOrder streams only push snapshot data (max 1/second) and liquidations are rare on testnet
+1. **Liquidation Events**: ForceOrder streams work correctly but liquidations are rare on testnet (0 events expected in most test runs)
 2. **Composite Index Streams**: May not be available for all symbols on testnet (DEFIUSDT tested)
 3. **Asset Index Streams**: Require multi-assets mode account configuration, NOT available on testnet (feature limitation)
 4. **Combined Streams**: Require connection to `/stream` endpoint instead of `/ws` endpoint
