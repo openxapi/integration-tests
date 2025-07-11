@@ -362,20 +362,20 @@ func TestConcurrentSubscriptionErrors(t *testing.T) {
 		t.Fatalf("Failed initial subscription: %v", err)
 	}
 
-	// Try rapid subscribe/unsubscribe cycles
-	for i := 0; i < 5; i++ {
+	// Try controlled subscribe/unsubscribe cycles (reduced concurrency to avoid rate limits)
+	for i := 0; i < 3; i++ { // Reduced from 5 to 3 iterations
 		go func(iteration int) {
-			time.Sleep(time.Duration(iteration) * 100 * time.Millisecond)
+			time.Sleep(time.Duration(iteration) * 500 * time.Millisecond) // Increased delay
 			
-			// Try to unsubscribe and resubscribe rapidly
+			// Try to unsubscribe and resubscribe with longer delays
 			client.Unsubscribe(ctx, []string{stream})
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond) // Increased from 50ms to 300ms
 			client.Subscribe(ctx, []string{stream})
 		}(i)
 	}
 
-	// Wait for all goroutines to complete
-	time.Sleep(2 * time.Second)
+	// Wait for all goroutines to complete with longer timeout
+	time.Sleep(4 * time.Second) // Increased from 2s to 4s
 
 	// Check if we still have a working connection
 	if !client.IsConnected() {

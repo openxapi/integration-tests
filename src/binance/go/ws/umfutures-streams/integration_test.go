@@ -420,14 +420,26 @@ func setupAndConnectClient(t *testing.T) *StreamTestClient {
 	client := createTestClient(t)
 	client.SetupEventHandlers()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := client.Connect(ctx); err != nil {
-		t.Fatalf("Failed to connect: %v", err)
+	// Retry connection up to 3 times for network resilience
+	var err error
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err = client.Connect(ctx)
+		cancel()
+		
+		if err == nil {
+			return client // Success
+		}
+		
+		if attempt < maxRetries {
+			t.Logf("Connection attempt %d failed: %v, retrying...", attempt, err)
+			time.Sleep(time.Duration(attempt) * time.Second) // Exponential backoff
+		}
 	}
-
-	return client
+	
+	t.Fatalf("Failed to connect after %d attempts: %v", maxRetries, err)
+	return nil // Won't reach here
 }
 
 // Helper function to setup and connect client to combined streams
@@ -435,14 +447,26 @@ func setupAndConnectCombinedStreamsClient(t *testing.T) *StreamTestClient {
 	client := createTestClient(t)
 	client.SetupEventHandlersForCombinedStreams() // Don't register combined handler to allow individual handlers
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := client.ConnectToCombinedStreams(ctx); err != nil {
-		t.Fatalf("Failed to connect to combined streams: %v", err)
+	// Retry connection up to 3 times for network resilience
+	var err error
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err = client.ConnectToCombinedStreams(ctx)
+		cancel()
+		
+		if err == nil {
+			return client // Success
+		}
+		
+		if attempt < maxRetries {
+			t.Logf("Combined streams connection attempt %d failed: %v, retrying...", attempt, err)
+			time.Sleep(time.Duration(attempt) * time.Second) // Exponential backoff
+		}
 	}
-
-	return client
+	
+	t.Fatalf("Failed to connect to combined streams after %d attempts: %v", maxRetries, err)
+	return nil // Won't reach here
 }
 
 // Helper function to test stream subscription

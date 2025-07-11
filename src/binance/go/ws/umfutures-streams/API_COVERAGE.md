@@ -27,6 +27,17 @@ This document tracks the integration test coverage for the Binance USD-M Futures
 | **Diff Depth Stream** | `<symbol>@depth` | ✅ | `streams_test.go` | Working |
 | **Composite Index Stream** | `<symbol>@compositeIndex` | ✅ | `streams_test.go` | Working (limited testnet availability) |
 | **Multi-Assets Mode Asset Index** | `<symbol>@assetIndex` | ✅ | `streams_test.go` | Working (requires multi-assets mode) |
+| **All Asset Index Stream** | `!assetIndex@arr` | ✅ | `streams_test.go` | Working (requires multi-assets mode) |
+
+### ✅ All Array (@arr) Streams
+
+| Stream Type | Format | Test Coverage | Test File | Status |
+|-------------|--------|---------------|-----------|--------|
+| **All Symbols Ticker** | `!ticker@arr` | ✅ | `streams_test.go` | Working |
+| **All Symbols Mini Ticker** | `!miniTicker@arr` | ✅ | `streams_test.go` | Working |
+| **All Symbols Book Ticker** | `!bookTicker` | ✅ | `streams_test.go` | Working |
+| **All Asset Index** | `!assetIndex@arr` | ✅ | `streams_test.go` | Working (requires multi-assets mode) |
+| **All Symbols Force Order** | `!forceOrder@arr` | ✅ | `streams_test.go` | Working (rare events on testnet) |
 
 ### ✅ All Symbols Streams
 
