@@ -194,6 +194,9 @@ func testOrderStatus(client *spotws.Client, config TestConfig) error {
 	var orderID int64
 	select {
 	case response := <-orderChan:
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in order response")
+		}
 		orderID = response.Result.OrderId
 	case err := <-orderErrChan:
 		return fmt.Errorf("failed to create order for status test: %w", err)
@@ -258,6 +261,9 @@ func testCancelOrder(client *spotws.Client, config TestConfig) error {
 	var orderID int64
 	select {
 	case response := <-orderChan:
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in order response")
+		}
 		orderID = response.Result.OrderId
 	case err := <-orderErrChan:
 		return fmt.Errorf("failed to create order for cancel test: %w", err)
@@ -340,6 +346,9 @@ func testSorOrderTest(client *spotws.Client, config TestConfig) error {
 	var hasSORS bool
 	select {
 	case response := <-exchangeInfoChan:
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in exchange info response")
+		}
 		hasSORS = len(response.Result.Sors) > 0
 	case err := <-exchangeInfoErrChan:
 		return fmt.Errorf("failed to get exchange info for SOR test: %w", err)

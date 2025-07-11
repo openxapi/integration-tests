@@ -199,8 +199,7 @@ func testOrderPlace(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			if response.Result.OrderId == 0 {
 				responseChan <- fmt.Errorf("order ID is 0")
 				return nil
@@ -286,7 +285,9 @@ func testOrderStatus(client *umfuturesws.Client, config TestConfig) error {
 	var orderID int64
 	select {
 	case response := <-orderChan:
-		// Result is a value type, not a pointer
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in order response")
+		}
 		orderID = response.Result.OrderId
 	case err := <-orderErrChan:
 		return fmt.Errorf("failed to create order for status test: %w", err)
@@ -313,8 +314,7 @@ func testOrderStatus(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			if response.Result.OrderId != orderID {
 				responseChan <- fmt.Errorf("expected order ID %d, got %d", orderID, response.Result.OrderId)
 				return nil
@@ -397,7 +397,9 @@ func testOrderCancel(client *umfuturesws.Client, config TestConfig) error {
 	var orderID int64
 	select {
 	case response := <-orderChan:
-		// Result is a value type, not a pointer
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in order response")
+		}
 		orderID = response.Result.OrderId
 	case err := <-orderErrChan:
 		return fmt.Errorf("failed to create order for cancel test: %w", err)
@@ -424,8 +426,7 @@ func testOrderCancel(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			if response.Result.OrderId != orderID {
 				responseChan <- fmt.Errorf("expected order ID %d, got %d", orderID, response.Result.OrderId)
 				return nil
@@ -530,7 +531,9 @@ func testOrderModify(client *umfuturesws.Client, config TestConfig) error {
 	var orderID int64
 	select {
 	case response := <-orderChan:
-		// Result is a value type, not a pointer
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in order response")
+		}
 		orderID = response.Result.OrderId
 	case err := <-orderErrChan:
 		return fmt.Errorf("failed to create order for modify test: %w", err)
@@ -560,8 +563,7 @@ func testOrderModify(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			if response.Result.OrderId == 0 {
 				responseChan <- fmt.Errorf("modified order ID is 0")
 				return nil
