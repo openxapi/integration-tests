@@ -97,6 +97,14 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Connection tests
 		{"Connection", TestConnection, true},
 		{"ServerManagement", TestServerManagement, true},
+		{"ConnectionTimeout", TestConnectionTimeout, true},
+		{"MultipleConnections", TestMultipleConnections, true},
+		{"ConnectToSpecificServer", TestConnectToSpecificServer, true},
+		{"ConnectionRecovery", TestConnectionRecovery, false},
+		{"ConnectToSingleStreams", TestConnectToSingleStreams, true},
+		{"ConnectToCombinedStreams", TestConnectToCombinedStreams, true},
+		{"ConnectToSingleStreamsMicrosecond", TestConnectToSingleStreamsMicrosecond, false},
+		{"ConnectToCombinedStreamsMicrosecond", TestConnectToCombinedStreamsMicrosecond, false},
 
 		// Basic stream tests
 		{"TradeStream", TestTradeStream, true},
@@ -105,6 +113,11 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"TickerStream", TestTickerStream, true},
 		{"MiniTickerStream", TestMiniTickerStream, true},
 		{"BookTickerStream", TestBookTickerStream, true},
+		{"MultipleSymbolStreams", TestMultipleSymbolStreams, true},
+		{"DifferentKlineIntervals", TestDifferentKlineIntervals, false},
+		{"AllTickerStream", TestAllTickerStream, false},
+		{"AllMiniTickerStream", TestAllMiniTickerStream, false},
+		{"AllBookTickerStream", TestAllBookTickerStream, false},
 
 		// Depth stream tests
 		{"DepthStream", TestDepthStream, true},
@@ -123,10 +136,20 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"SubscriptionManagement", TestSubscriptionManagement, true},
 		{"MultipleStreamsSubscription", TestMultipleStreamsSubscription, true},
 		{"StreamUnsubscription", TestStreamUnsubscription, true},
+		{"ListSubscriptions", TestListSubscriptions, false},
+		{"SubscriptionToInvalidStream", TestSubscriptionToInvalidStream, true},
+		{"Resubscription", TestResubscription, false},
+		{"BatchSubscription", TestBatchSubscription, false},
 
 		// Error handling tests
 		{"ErrorHandling", TestErrorHandling, true},
 		{"InvalidStreamNames", TestInvalidStreamNames, true},
+		{"ConnectionErrors", TestConnectionErrors, true},
+		{"UnsubscribeNonExistentStream", TestUnsubscribeNonExistentStream, true},
+		{"EmptyStreamList", TestEmptyStreamList, true},
+		{"MaxStreamLimits", TestMaxStreamLimits, false},
+		{"ReconnectionAfterError", TestReconnectionAfterError, false},
+		{"ConcurrentSubscriptionsError", TestConcurrentSubscriptions, false},
 
 		// Combined streams tests
 		{"CombinedStreamEventReception", TestCombinedStreamEventReception, true},
@@ -138,6 +161,9 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Performance tests
 		{"ConcurrentStreams", TestConcurrentStreams, false},
 		{"HighVolumeStreams", TestHighVolumeStreams, false},
+		{"StreamLatency", TestStreamLatency, false},
+		{"MemoryUsage", TestMemoryUsage, false},
+		{"RapidSubscriptionChanges", TestRapidSubscriptionChanges, false},
 	}
 
 	for _, testFunc := range testFunctions {

@@ -114,6 +114,9 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"BookTickerStream", TestBookTickerStream, true},
 		{"LiquidationOrderStream", TestLiquidationOrderStream, true},
 
+		// Array streams (@arr) tests
+		{"AllArrayStreams", TestAllArrayStreams, false},
+
 		// Depth stream tests
 		{"PartialDepthStream", TestPartialDepthStream, true},
 		{"DiffDepthStream", TestDiffDepthStream, true},
