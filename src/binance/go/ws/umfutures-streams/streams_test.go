@@ -60,8 +60,10 @@ func TestLiquidationOrderStream(t *testing.T) {
 		t.Skip("Skipping liquidation stream test in short mode - liquidations are rare on testnet")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 	streamName := "btcusdt@forceOrder"
@@ -104,8 +106,10 @@ func TestMultipleSymbolStreams(t *testing.T) {
 		t.Skip("Skipping multiple symbol streams test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -146,8 +150,10 @@ func TestMultipleStreamTypes(t *testing.T) {
 		t.Skip("Skipping combined streams test in short mode")
 	}
 
-	client := setupAndConnectCombinedStreamsClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -238,8 +244,10 @@ func TestDifferentKlineIntervals(t *testing.T) {
 		t.Skip("Skipping kline intervals test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -278,8 +286,10 @@ func TestDifferentDepthLevels(t *testing.T) {
 		t.Skip("Skipping depth levels test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -318,8 +328,10 @@ func TestDiffDepthStreamUpdateSpeed(t *testing.T) {
 		t.Skip("Skipping depth update speed test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -374,8 +386,10 @@ func TestPartialDepthStreamUpdateSpeed(t *testing.T) {
 		t.Skip("Skipping partial depth update speed test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -434,8 +448,10 @@ func TestCompositeIndexStream(t *testing.T) {
 		t.Skip("Skipping composite index stream test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 	streamName := "defiusdt@compositeIndex"
@@ -479,8 +495,10 @@ func TestAssetIndexStream(t *testing.T) {
 		t.Skip("Skipping asset index stream test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 	streamName := "btcusd@assetIndex"
@@ -523,8 +541,10 @@ func TestAllSymbolsStreams(t *testing.T) {
 		t.Skip("Skipping all symbols streams test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -650,8 +670,10 @@ func TestAllArrayStreams(t *testing.T) {
 		t.Skip("Skipping all array streams test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 	
