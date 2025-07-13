@@ -129,8 +129,10 @@ func testUserDataStreamStart(client *umfuturesws.Client, config TestConfig) erro
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+			if response.Result == nil {
+				responseChan <- fmt.Errorf("received nil result in user data stream start response")
+				return nil
+			}
 			if response.Result.ListenKey == "" {
 				responseChan <- fmt.Errorf("listen key is empty")
 				return nil
@@ -302,8 +304,7 @@ func testAccountBalance(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			responseChan <- nil
 			return nil
 		})
@@ -340,8 +341,7 @@ func testAccountPosition(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			responseChan <- nil
 			return nil
 		})
@@ -377,8 +377,7 @@ func testAccountStatus(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			responseChan <- nil
 			return nil
 		})
@@ -415,8 +414,7 @@ func testV2AccountBalance(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			responseChan <- nil
 			return nil
 		})
@@ -453,8 +451,7 @@ func testV2AccountPosition(client *umfuturesws.Client, config TestConfig) error 
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			responseChan <- nil
 			return nil
 		})
@@ -490,8 +487,7 @@ func testV2AccountStatus(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			responseChan <- nil
 			return nil
 		})

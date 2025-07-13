@@ -276,9 +276,35 @@ func setupClient(config TestConfig) (*umfuturesws.Client, error) {
 		client.SetAuth(auth)
 	}
 
-	// Note: Unlike spot, umfutures uses a generic event handler system
-	// No specific handler methods like HandleEventStreamTerminated are available
-	// Events would be registered using client.eventHandler.RegisterHandler if needed
+	// Register event handlers to prevent "No handler found" errors
+	// These are silent handlers that simply prevent warnings
+	client.HandleAccountConfigUpdate(func(event *models.AccountConfigUpdate) error {
+		return nil
+	})
+	client.HandleAccountUpdate(func(event *models.AccountUpdate) error {
+		return nil
+	})
+	client.HandleOrderTradeUpdate(func(event *models.OrderTradeUpdate) error {
+		return nil
+	})
+	client.HandleConditionalOrderTriggerReject(func(event *models.ConditionalOrderTriggerReject) error {
+		return nil
+	})
+	client.HandleGridUpdate(func(event *models.GridUpdate) error {
+		return nil
+	})
+	client.HandleListenKeyExpired(func(event *models.ListenKeyExpired) error {
+		return nil
+	})
+	client.HandleMarginCall(func(event *models.MarginCall) error {
+		return nil
+	})
+	client.HandleStrategyUpdate(func(event *models.StrategyUpdate) error {
+		return nil
+	})
+	client.HandleTradeLite(func(event *models.TradeLite) error {
+		return nil
+	})
 
 	// Connect to the WebSocket server
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -550,6 +576,9 @@ func getCurrentPrice(client *umfuturesws.Client, symbol string) (float64, error)
 
 	select {
 	case response := <-responseChan:
+		if response.Result == nil {
+			return 0, fmt.Errorf("received nil result in ticker price response")
+		}
 		if response.Result.Price != "" {
 			return strconv.ParseFloat(response.Result.Price, 64)
 		}

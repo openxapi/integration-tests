@@ -560,6 +560,9 @@ func getCurrentPrice(client *spotws.Client, symbol string) (float64, error) {
 
 	select {
 	case response := <-responseChan:
+		if response.Result == nil {
+			return 0, fmt.Errorf("received nil result in ticker price response")
+		}
 		if response.Result.Price != "" {
 			return strconv.ParseFloat(response.Result.Price, 64)
 		}

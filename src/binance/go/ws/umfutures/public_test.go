@@ -64,8 +64,10 @@ func testTickerPrice(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+			if response.Result == nil {
+				responseChan <- fmt.Errorf("received nil result in ticker price response")
+				return nil
+			}
 			if response.Result.Symbol != "BTCUSDT" {
 				responseChan <- fmt.Errorf("expected symbol BTCUSDT, got %s", response.Result.Symbol)
 				return nil
@@ -112,8 +114,10 @@ func testBookTicker(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+			if response.Result == nil {
+				responseChan <- fmt.Errorf("received nil result in response")
+				return nil
+			}
 			if response.Result.Symbol != "BTCUSDT" {
 				responseChan <- fmt.Errorf("expected symbol BTCUSDT, got %s", response.Result.Symbol)
 				return nil
@@ -167,8 +171,7 @@ func testDepth(client *umfuturesws.Client, config TestConfig) error {
 				return nil
 			}
 
-			// Result is a value type, not a pointer
-
+	
 			if len(response.Result.Bids) == 0 {
 				responseChan <- fmt.Errorf("no bids in depth response")
 				return nil

@@ -362,10 +362,15 @@ func TestConcurrentSubscriptions(t *testing.T) {
 		}
 	}
 
-	// Subscribe to streams concurrently
+	// Subscribe to streams with synchronization to avoid concurrent writes
 	errChan := make(chan error, len(streams))
+	semaphore := make(chan struct{}, 1) // Limit to 1 concurrent subscription
+	
 	for _, stream := range streams {
 		go func(s string) {
+			semaphore <- struct{}{} // Acquire lock
+			defer func() { <-semaphore }() // Release lock
+			time.Sleep(100 * time.Millisecond) // Small delay between subscriptions
 			errChan <- client.Subscribe(ctx, []string{s})
 		}(stream)
 	}

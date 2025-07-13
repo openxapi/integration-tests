@@ -320,6 +320,9 @@ func testUserDataStreamPing(client *spotws.Client, config TestConfig) error {
 	var listenKey string
 	select {
 	case response := <-startChan:
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in user data stream start response")
+		}
 		listenKey = response.Result.ListenKey
 	case err := <-startErrChan:
 		return fmt.Errorf("failed to get listen key: %w", err)
@@ -382,6 +385,9 @@ func testUserDataStreamStop(client *spotws.Client, config TestConfig) error {
 	var listenKey string
 	select {
 	case response := <-startChan:
+		if response.Result == nil {
+			return fmt.Errorf("received nil result in user data stream start response")
+		}
 		listenKey = response.Result.ListenKey
 	case err := <-startErrChan:
 		return fmt.Errorf("failed to get listen key: %w", err)

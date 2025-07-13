@@ -112,30 +112,38 @@ func TestFullIntegrationSuite(t *testing.T) {
 			name         string
 			fn           func(*umfuturesws.Client, TestConfig) error
 			authRequired AuthType
+			keyRequired  *KeyType // Optional: only run for specific key types
+			keyExcluded  *KeyType // Optional: skip for specific key types
 		}{
 			// Public tests (no auth required)
-			{"TickerPrice", testTickerPrice, AuthTypeNONE},
-			{"BookTicker", testBookTicker, AuthTypeNONE},
-			{"Depth", testDepth, AuthTypeNONE},
+			{"TickerPrice", testTickerPrice, AuthTypeNONE, nil, nil},
+			{"BookTicker", testBookTicker, AuthTypeNONE, nil, nil},
+			{"Depth", testDepth, AuthTypeNONE, nil, nil},
 
 			// User data tests
-			{"AccountBalance", testAccountBalance, AuthTypeUSER_DATA},
-			{"AccountPosition", testAccountPosition, AuthTypeUSER_DATA},
-			{"AccountStatus", testAccountStatus, AuthTypeUSER_DATA},
-			{"V2AccountBalance", testV2AccountBalance, AuthTypeUSER_DATA},
-			{"V2AccountPosition", testV2AccountPosition, AuthTypeUSER_DATA},
-			{"V2AccountStatus", testV2AccountStatus, AuthTypeUSER_DATA},
+			{"AccountBalance", testAccountBalance, AuthTypeUSER_DATA, nil, nil},
+			{"AccountPosition", testAccountPosition, AuthTypeUSER_DATA, nil, nil},
+			{"AccountStatus", testAccountStatus, AuthTypeUSER_DATA, nil, nil},
+			{"V2AccountBalance", testV2AccountBalance, AuthTypeUSER_DATA, nil, nil},
+			{"V2AccountPosition", testV2AccountPosition, AuthTypeUSER_DATA, nil, nil},
+			{"V2AccountStatus", testV2AccountStatus, AuthTypeUSER_DATA, nil, nil},
 
 			// User stream tests
-			{"UserDataStreamStart", testUserDataStreamStart, AuthTypeUSER_STREAM},
-			{"UserDataStreamPing", testUserDataStreamPing, AuthTypeUSER_STREAM},
-			{"UserDataStreamStop", testUserDataStreamStop, AuthTypeUSER_STREAM},
+			{"UserDataStreamStart", testUserDataStreamStart, AuthTypeUSER_STREAM, nil, nil},
+			{"UserDataStreamPing", testUserDataStreamPing, AuthTypeUSER_STREAM, nil, nil},
+			{"UserDataStreamStop", testUserDataStreamStop, AuthTypeUSER_STREAM, nil, nil},
+			{"UserDataEventHandlers", testUserDataEventHandlers, AuthTypeUSER_STREAM, nil, nil},
+
+			// Session tests (authentication requirements updated)
+			{"SessionLogon", testSessionLogon, AuthTypeUSER_STREAM, &[]KeyType{KeyTypeED25519}[0], nil},    // Ed25519 only
+			{"SessionLogout", testSessionLogout, AuthTypeUSER_STREAM, nil, nil},  // Uses NONE auth internally
+			{"SessionStatus", testSessionStatus, AuthTypeUSER_STREAM, nil, nil},  // Uses NONE auth internally
 
 			// Trading tests
-			{"OrderPlace", testOrderPlace, AuthTypeTRADE},
-			{"OrderStatus", testOrderStatus, AuthTypeTRADE},
-			{"OrderCancel", testOrderCancel, AuthTypeTRADE},
-			{"OrderModify", testOrderModify, AuthTypeTRADE},
+			{"OrderPlace", testOrderPlace, AuthTypeTRADE, nil, nil},
+			{"OrderStatus", testOrderStatus, AuthTypeTRADE, nil, nil},
+			{"OrderCancel", testOrderCancel, AuthTypeTRADE, nil, nil},
+			{"OrderModify", testOrderModify, AuthTypeTRADE, nil, nil},
 		}
 
 		client, err := setupClient(config)
@@ -146,6 +154,18 @@ func TestFullIntegrationSuite(t *testing.T) {
 		for _, testFunc := range testFunctions {
 			// Check if test should run for this configuration
 			if testFunc.authRequired != config.AuthType {
+				continue
+			}
+
+			// Check if test requires specific key type
+			if testFunc.keyRequired != nil && config.KeyType != *testFunc.keyRequired {
+				continue
+			}
+
+			// Check if test should be excluded for this key type
+			if testFunc.keyExcluded != nil && config.KeyType == *testFunc.keyExcluded {
+				// Log that we're skipping this test
+				t.Logf("   🧪 Skipping %s... ⏭️  (Not supported with %s authentication)", testFunc.name, config.KeyType)
 				continue
 			}
 

@@ -16,6 +16,9 @@ func TestMain(m *testing.M) {
 	// Run the tests
 	code := m.Run()
 
+	// Clean up all shared clients
+	disconnectAllSharedClients()
+
 	// Print summary if running all tests
 	if testing.Verbose() {
 		printTestSummary()
@@ -26,20 +29,31 @@ func TestMain(m *testing.M) {
 
 func printTestSummary() {
 	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("📊 SPOT STREAMS INTEGRATION TEST SUMMARY")
+	fmt.Println("📊 USD-M FUTURES STREAMS INTEGRATION TEST SUMMARY")
 	fmt.Println(strings.Repeat("=", 80))
 
-	fmt.Printf("📋 Available Stream Types:\n")
-	fmt.Printf("  - Trade Streams: symbol@trade\n")
+	configs := getTestConfigs()
+
+	fmt.Printf("📋 Available Test Configurations:\n")
+	for _, config := range configs {
+		fmt.Printf("  - %s: %s\n", config.Name, config.Description)
+	}
+
+	fmt.Printf("\n📋 Available Stream Types:\n")
 	fmt.Printf("  - Aggregate Trade Streams: symbol@aggTrade\n")
+	fmt.Printf("  - Mark Price Streams: symbol@markPrice\n")
 	fmt.Printf("  - Kline Streams: symbol@kline_interval\n")
+	fmt.Printf("  - Continuous Kline Streams: pair_contractType@continuousKline_interval\n")
 	fmt.Printf("  - Mini Ticker Streams: symbol@miniTicker\n")
 	fmt.Printf("  - Ticker Streams: symbol@ticker\n")
 	fmt.Printf("  - Book Ticker Streams: symbol@bookTicker\n")
-	fmt.Printf("  - Depth Streams: symbol@depth\n")
+	fmt.Printf("  - Liquidation Order Streams: symbol@forceOrder\n")
 	fmt.Printf("  - Partial Depth Streams: symbol@depth5, symbol@depth10, symbol@depth20\n")
-	fmt.Printf("  - Rolling Window Ticker: symbol@ticker_1h, symbol@ticker_4h\n")
-	fmt.Printf("  - Average Price: symbol@avgPrice\n")
+	fmt.Printf("  - Diff Depth Streams: symbol@depth\n")
+	fmt.Printf("  - BLVT Info Streams: symbol@tokenInfo\n")
+	fmt.Printf("  - BLVT Kline Streams: symbol@tokenKline_interval\n")
+	fmt.Printf("  - Composite Index Streams: symbol@compositeIndex\n")
+	fmt.Printf("  - Multi-Assets Mode Asset Index Streams: symbol@assetIndex\n")
 
 	fmt.Printf("\n💡 Usage Examples:\n")
 	fmt.Printf("  # Run all tests:\n")
@@ -49,11 +63,13 @@ func printTestSummary() {
 	fmt.Printf("  go test -v -run TestFullIntegrationSuite\n\n")
 
 	fmt.Printf("  # Run specific stream tests:\n")
-	fmt.Printf("  go test -v -run TestTradeStream\n")
+	fmt.Printf("  go test -v -run TestAggregateTradeStream\n")
+	fmt.Printf("  go test -v -run TestMarkPriceStream\n")
 	fmt.Printf("  go test -v -run TestKlineStream\n")
-	fmt.Printf("  go test -v -run TestDepthStream\n")
-	fmt.Printf("  go test -v -run TestDepthStreamUpdateSpeed\n")
-	fmt.Printf("  go test -v -run TestPartialDepthStreamUpdateSpeed\n")
+	fmt.Printf("  go test -v -run TestContinuousKlineStream\n")
+	fmt.Printf("  go test -v -run TestLiquidationOrderStream\n")
+	fmt.Printf("  go test -v -run TestPartialDepthStream\n")
+	fmt.Printf("  go test -v -run TestDiffDepthStream\n")
 	fmt.Printf("  go test -v -run TestMultipleStreamTypes\n\n")
 
 	fmt.Printf("  # Run connection tests:\n")
@@ -62,12 +78,15 @@ func printTestSummary() {
 	fmt.Printf("  # Run subscription management tests:\n")
 	fmt.Printf("  go test -v -run TestSubscription\n\n")
 
+	fmt.Printf("  # Run comprehensive integration suites:\n")
+	fmt.Printf("  go test -v -run TestMarketStreamsIntegration\n\n")
+
 	fmt.Printf("  # Run with timeout:\n")
 	fmt.Printf("  go test -v -timeout 10m\n\n")
 
 	fmt.Printf("⚠️  Notes:\n")
-	fmt.Printf("  - Most spot streams are public and don't require authentication\n")
-	fmt.Printf("  - Tests use Binance testnet servers (wss://stream.testnet.binance.vision/ws)\n")
+	fmt.Printf("  - Most USD-M futures streams are public and don't require authentication\n")
+	fmt.Printf("  - Tests use Binance testnet servers (wss://fstream.binancefuture.com/ws)\n")
 	fmt.Printf("  - Rate limiting: 1 connection per test for stability\n")
 	fmt.Printf("  - Tests wait for real market data events\n")
 	fmt.Printf("  - Some tests may be skipped in short mode\n")
@@ -77,9 +96,9 @@ func printTestSummary() {
 
 // Integration test that runs the full integration suite
 func TestFullIntegrationSuite(t *testing.T) {
-	t.Log("🚀 Running Full Spot Streams Integration Test Suite")
+	t.Log("🚀 Running Full USD-M Futures Streams Integration Test Suite")
 	t.Log("================================================================================")
-	t.Log("🌐 Server: Binance Testnet (wss://stream.testnet.binance.vision/ws)")
+	t.Log("🌐 Server: Binance Testnet (wss://fstream.binancefuture.com/ws)")
 	t.Log("💡 Public streams - no authentication required")
 	t.Log("================================================================================")
 
@@ -97,73 +116,64 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Connection tests
 		{"Connection", TestConnection, true},
 		{"ServerManagement", TestServerManagement, true},
-		{"ConnectionTimeout", TestConnectionTimeout, true},
-		{"MultipleConnections", TestMultipleConnections, true},
-		{"ConnectToSpecificServer", TestConnectToSpecificServer, true},
-		{"ConnectionRecovery", TestConnectionRecovery, false},
-		{"ConnectToSingleStreams", TestConnectToSingleStreams, true},
-		{"ConnectToCombinedStreams", TestConnectToCombinedStreams, true},
-		{"ConnectToSingleStreamsMicrosecond", TestConnectToSingleStreamsMicrosecond, false},
-		{"ConnectToCombinedStreamsMicrosecond", TestConnectToCombinedStreamsMicrosecond, false},
+		{"AdvancedServerManagement", TestAdvancedServerManagement, true},
+
+		// Enhanced connection methods
+		{"EnhancedConnectionMethods", TestEnhancedConnectionMethods, true},
 
 		// Basic stream tests
-		{"TradeStream", TestTradeStream, true},
 		{"AggregateTradeStream", TestAggregateTradeStream, true},
+		{"MarkPriceStream", TestMarkPriceStream, true},
 		{"KlineStream", TestKlineStream, true},
-		{"TickerStream", TestTickerStream, true},
+		{"ContinuousKlineStream", TestContinuousKlineStream, true},
 		{"MiniTickerStream", TestMiniTickerStream, true},
+		{"TickerStream", TestTickerStream, true},
 		{"BookTickerStream", TestBookTickerStream, true},
-		{"MultipleSymbolStreams", TestMultipleSymbolStreams, true},
-		{"DifferentKlineIntervals", TestDifferentKlineIntervals, false},
-		{"AllTickerStream", TestAllTickerStream, false},
-		{"AllMiniTickerStream", TestAllMiniTickerStream, false},
-		{"AllBookTickerStream", TestAllBookTickerStream, false},
+		{"LiquidationOrderStream", TestLiquidationOrderStream, true},
+
+		// Array streams (@arr) tests
+		{"AllArrayStreams", TestAllArrayStreams, false},
 
 		// Depth stream tests
-		{"DepthStream", TestDepthStream, true},
 		{"PartialDepthStream", TestPartialDepthStream, true},
+		{"DiffDepthStream", TestDiffDepthStream, true},
 		{"DifferentDepthLevels", TestDifferentDepthLevels, true},
-		{"DepthStreamUpdateSpeed", TestDepthStreamUpdateSpeed, true},
+		{"DiffDepthStreamUpdateSpeed", TestDiffDepthStreamUpdateSpeed, true},
 		{"PartialDepthStreamUpdateSpeed", TestPartialDepthStreamUpdateSpeed, true},
-		{"DepthStreamSpeedComparison", TestDepthStreamSpeedComparison, false},
 
-		// Advanced stream tests
-		{"RollingWindowTickerStream", TestRollingWindowTickerStream, false},
-		{"AvgPriceStream", TestAvgPriceStream, false},
+		// Special stream tests
+		{"CompositeIndexStream", TestCompositeIndexStream, false},
+		{"AssetIndexStream", TestAssetIndexStream, false},
 		{"MultipleStreamTypes", TestMultipleStreamTypes, true},
+
+		// New enhanced event handlers
+		{"ContractInfoEventHandler", TestContractInfoEventHandler, false},
+		{"AssetIndexEventHandler", TestAssetIndexEventHandler, false},
+		{"CombinedStreamEventHandler", TestCombinedStreamEventHandler, true},
+		{"SubscriptionResponseHandler", TestSubscriptionResponseHandler, true},
+		{"StreamErrorHandler", TestStreamErrorHandler, true},
+
 
 		// Subscription management tests
 		{"SubscriptionManagement", TestSubscriptionManagement, true},
 		{"MultipleStreamsSubscription", TestMultipleStreamsSubscription, true},
 		{"StreamUnsubscription", TestStreamUnsubscription, true},
-		{"ListSubscriptions", TestListSubscriptions, false},
-		{"SubscriptionToInvalidStream", TestSubscriptionToInvalidStream, true},
-		{"Resubscription", TestResubscription, false},
-		{"BatchSubscription", TestBatchSubscription, false},
 
 		// Error handling tests
 		{"ErrorHandling", TestErrorHandling, true},
 		{"InvalidStreamNames", TestInvalidStreamNames, true},
-		{"ConnectionErrors", TestConnectionErrors, true},
-		{"UnsubscribeNonExistentStream", TestUnsubscribeNonExistentStream, true},
-		{"EmptyStreamList", TestEmptyStreamList, true},
-		{"MaxStreamLimits", TestMaxStreamLimits, false},
-		{"ReconnectionAfterError", TestReconnectionAfterError, false},
-		{"ConcurrentSubscriptionsError", TestConcurrentSubscriptions, false},
 
 		// Combined streams tests
 		{"CombinedStreamEventReception", TestCombinedStreamEventReception, true},
 		{"CombinedStreamEventDataTypes", TestCombinedStreamEventDataTypes, true},
-		{"CombinedStreamMicrosecondPrecision", TestCombinedStreamMicrosecondPrecision, false},
-		{"SingleVsCombinedStreamComparison", TestSingleVsCombinedStreamComparison, false},
 		{"CombinedStreamSubscriptionManagement", TestCombinedStreamSubscriptionManagement, true},
 
 		// Performance tests
 		{"ConcurrentStreams", TestConcurrentStreams, false},
 		{"HighVolumeStreams", TestHighVolumeStreams, false},
-		{"StreamLatency", TestStreamLatency, false},
-		{"MemoryUsage", TestMemoryUsage, false},
-		{"RapidSubscriptionChanges", TestRapidSubscriptionChanges, false},
+
+		// Comprehensive Integration Suites
+		{"MarketStreamsIntegration", TestMarketStreamsIntegration, true},
 	}
 
 	for _, testFunc := range testFunctions {
