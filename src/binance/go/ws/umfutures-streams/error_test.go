@@ -12,8 +12,10 @@ func TestErrorHandling(t *testing.T) {
 		t.Skip("Skipping error handling test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -66,7 +68,7 @@ func TestInvalidStreamNames(t *testing.T) {
 		t.Run("invalid_"+invalidStream, func(t *testing.T) {
 			// Create a new client for each test to avoid connection pollution
 			client := setupAndConnectClient(t)
-			defer client.Disconnect()
+			// Note: Don't disconnect shared client - let TestMain handle cleanup
 			
 			// Try to subscribe to invalid stream
 			err := client.Subscribe(ctx, []string{invalidStream})
@@ -135,8 +137,10 @@ func TestUnsubscribeNonexistentStream(t *testing.T) {
 		t.Skip("Skipping unsubscribe nonexistent stream test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -193,8 +197,10 @@ func TestEmptyStreamLists(t *testing.T) {
 		t.Skip("Skipping empty stream lists test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -221,8 +227,10 @@ func TestMaxStreamLimits(t *testing.T) {
 		t.Skip("Skipping max stream limits test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -349,8 +357,10 @@ func TestConcurrentSubscriptionErrors(t *testing.T) {
 		t.Skip("Skipping concurrent subscription errors test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 

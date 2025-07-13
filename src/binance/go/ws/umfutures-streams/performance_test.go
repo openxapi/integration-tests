@@ -90,8 +90,10 @@ func TestHighVolumeStreams(t *testing.T) {
 		t.Skip("Skipping high volume streams test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -285,8 +287,10 @@ func TestStreamLatency(t *testing.T) {
 		t.Skip("Skipping stream latency test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -359,8 +363,10 @@ func TestMemoryUsage(t *testing.T) {
 		t.Skip("Skipping memory usage test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -415,8 +421,10 @@ func TestRapidSubscriptionChanges(t *testing.T) {
 		t.Skip("Skipping rapid subscription changes test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 

@@ -12,8 +12,10 @@ func TestSubscriptionManagement(t *testing.T) {
 		t.Skip("Skipping subscription management test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -61,8 +63,10 @@ func TestMultipleStreamsSubscription(t *testing.T) {
 		t.Skip("Skipping multiple streams subscription test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -114,8 +118,10 @@ func TestStreamUnsubscription(t *testing.T) {
 		t.Skip("Skipping stream unsubscription test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -191,8 +197,10 @@ func TestResubscription(t *testing.T) {
 		t.Skip("Skipping resubscription test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 	stream := "btcusdt@aggTrade"
@@ -248,8 +256,10 @@ func TestBatchSubscription(t *testing.T) {
 		t.Skip("Skipping batch subscription test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
@@ -305,8 +315,10 @@ func TestSubscriptionTracking(t *testing.T) {
 		t.Skip("Skipping subscription tracking test in short mode")
 	}
 
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
 
 	ctx := context.Background()
 
