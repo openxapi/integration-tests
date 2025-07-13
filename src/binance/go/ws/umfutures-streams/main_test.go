@@ -16,6 +16,9 @@ func TestMain(m *testing.M) {
 	// Run the tests
 	code := m.Run()
 
+	// Clean up all shared clients
+	disconnectAllSharedClients()
+
 	// Print summary if running all tests
 	if testing.Verbose() {
 		printTestSummary()
@@ -29,7 +32,14 @@ func printTestSummary() {
 	fmt.Println("📊 USD-M FUTURES STREAMS INTEGRATION TEST SUMMARY")
 	fmt.Println(strings.Repeat("=", 80))
 
-	fmt.Printf("📋 Available Stream Types:\n")
+	configs := getTestConfigs()
+
+	fmt.Printf("📋 Available Test Configurations:\n")
+	for _, config := range configs {
+		fmt.Printf("  - %s: %s\n", config.Name, config.Description)
+	}
+
+	fmt.Printf("\n📋 Available Stream Types:\n")
 	fmt.Printf("  - Aggregate Trade Streams: symbol@aggTrade\n")
 	fmt.Printf("  - Mark Price Streams: symbol@markPrice\n")
 	fmt.Printf("  - Kline Streams: symbol@kline_interval\n")
@@ -68,6 +78,9 @@ func printTestSummary() {
 	fmt.Printf("  # Run subscription management tests:\n")
 	fmt.Printf("  go test -v -run TestSubscription\n\n")
 
+	fmt.Printf("  # Run comprehensive integration suites:\n")
+	fmt.Printf("  go test -v -run TestMarketStreamsIntegration\n\n")
+
 	fmt.Printf("  # Run with timeout:\n")
 	fmt.Printf("  go test -v -timeout 10m\n\n")
 
@@ -103,6 +116,10 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Connection tests
 		{"Connection", TestConnection, true},
 		{"ServerManagement", TestServerManagement, true},
+		{"AdvancedServerManagement", TestAdvancedServerManagement, true},
+
+		// Enhanced connection methods
+		{"EnhancedConnectionMethods", TestEnhancedConnectionMethods, true},
 
 		// Basic stream tests
 		{"AggregateTradeStream", TestAggregateTradeStream, true},
@@ -129,6 +146,14 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"AssetIndexStream", TestAssetIndexStream, false},
 		{"MultipleStreamTypes", TestMultipleStreamTypes, true},
 
+		// New enhanced event handlers
+		{"ContractInfoEventHandler", TestContractInfoEventHandler, false},
+		{"AssetIndexEventHandler", TestAssetIndexEventHandler, false},
+		{"CombinedStreamEventHandler", TestCombinedStreamEventHandler, true},
+		{"SubscriptionResponseHandler", TestSubscriptionResponseHandler, true},
+		{"StreamErrorHandler", TestStreamErrorHandler, true},
+
+
 		// Subscription management tests
 		{"SubscriptionManagement", TestSubscriptionManagement, true},
 		{"MultipleStreamsSubscription", TestMultipleStreamsSubscription, true},
@@ -146,6 +171,9 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Performance tests
 		{"ConcurrentStreams", TestConcurrentStreams, false},
 		{"HighVolumeStreams", TestHighVolumeStreams, false},
+
+		// Comprehensive Integration Suites
+		{"MarketStreamsIntegration", TestMarketStreamsIntegration, true},
 	}
 
 	for _, testFunc := range testFunctions {
