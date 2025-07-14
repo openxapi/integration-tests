@@ -171,9 +171,6 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Performance tests
 		{"ConcurrentStreams", TestConcurrentStreams, false},
 		{"HighVolumeStreams", TestHighVolumeStreams, false},
-
-		// Comprehensive Integration Suites
-		{"MarketStreamsIntegration", TestMarketStreamsIntegration, true},
 	}
 
 	for _, testFunc := range testFunctions {
