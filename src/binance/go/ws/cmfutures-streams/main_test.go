@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 
 func printTestSummary() {
 	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("📊 USD-M FUTURES STREAMS INTEGRATION TEST SUMMARY")
+	fmt.Println("📊 COIN-M FUTURES STREAMS INTEGRATION TEST SUMMARY")
 	fmt.Println(strings.Repeat("=", 80))
 
 	configs := getTestConfigs()
@@ -52,8 +52,6 @@ func printTestSummary() {
 	fmt.Printf("  - Diff Depth Streams: symbol@depth\n")
 	fmt.Printf("  - BLVT Info Streams: symbol@tokenInfo\n")
 	fmt.Printf("  - BLVT Kline Streams: symbol@tokenKline_interval\n")
-	fmt.Printf("  - Composite Index Streams: symbol@compositeIndex\n")
-	fmt.Printf("  - Multi-Assets Mode Asset Index Streams: symbol@assetIndex\n")
 
 	fmt.Printf("\n💡 Usage Examples:\n")
 	fmt.Printf("  # Run all tests:\n")
@@ -82,11 +80,11 @@ func printTestSummary() {
 	fmt.Printf("  go test -v -run TestMarketStreamsIntegration\n\n")
 
 	fmt.Printf("  # Run with timeout:\n")
-	fmt.Printf("  go test -v -timeout 10m\n\n")
+	fmt.Printf("  go test -v -timeout 20m\n\n")
 
 	fmt.Printf("⚠️  Notes:\n")
-	fmt.Printf("  - Most USD-M futures streams are public and don't require authentication\n")
-	fmt.Printf("  - Tests use Binance testnet servers (wss://fstream.binancefuture.com/ws)\n")
+	fmt.Printf("  - Most Coin-M futures streams are public and don't require authentication\n")
+	fmt.Printf("  - Tests use Binance testnet servers (wss://dstream.binancefuture.com/ws)\n")
 	fmt.Printf("  - Rate limiting: 1 connection per test for stability\n")
 	fmt.Printf("  - Tests wait for real market data events\n")
 	fmt.Printf("  - Some tests may be skipped in short mode\n")
@@ -96,9 +94,9 @@ func printTestSummary() {
 
 // Integration test that runs the full integration suite
 func TestFullIntegrationSuite(t *testing.T) {
-	t.Log("🚀 Running Full USD-M Futures Streams Integration Test Suite")
+	t.Log("🚀 Running Full Coin-M Futures Streams Integration Test Suite")
 	t.Log("================================================================================")
-	t.Log("🌐 Server: Binance Testnet (wss://fstream.binancefuture.com/ws)")
+	t.Log("🌐 Server: Binance Testnet (wss://dstream.binancefuture.com/ws)")
 	t.Log("💡 Public streams - no authentication required")
 	t.Log("================================================================================")
 
@@ -141,9 +139,7 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"DiffDepthStreamUpdateSpeed", TestDiffDepthStreamUpdateSpeed, true},
 		{"PartialDepthStreamUpdateSpeed", TestPartialDepthStreamUpdateSpeed, true},
 
-		// Special stream tests
-		{"CompositeIndexStream", TestCompositeIndexStream, false},
-		{"AssetIndexStream", TestAssetIndexStream, false},
+		// Special stream tests (Coin-M specific streams only)
 		{"MultipleStreamTypes", TestMultipleStreamTypes, true},
 
 		// New enhanced event handlers
@@ -152,6 +148,12 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"CombinedStreamEventHandler", TestCombinedStreamEventHandler, true},
 		{"SubscriptionResponseHandler", TestSubscriptionResponseHandler, true},
 		{"StreamErrorHandler", TestStreamErrorHandler, true},
+
+		// Missing stream type tests (for 100% coverage)
+		{"IndexPriceKlineStream", TestIndexPriceKlineStream, false},
+		{"MarkPriceKlineStream", TestMarkPriceKlineStream, false},
+		{"ContractInfoStream", TestContractInfoStream, false},
+		{"IndividualIndexPriceStream", TestIndividualIndexPriceStream, false},
 
 
 		// Subscription management tests
@@ -162,6 +164,11 @@ func TestFullIntegrationSuite(t *testing.T) {
 		// Error handling tests
 		{"ErrorHandling", TestErrorHandling, true},
 		{"InvalidStreamNames", TestInvalidStreamNames, true},
+		{"ComprehensiveErrorHandling", TestComprehensiveErrorHandling, true},
+
+		// Advanced feature tests
+		{"AdvancedPropertyManagement", TestAdvancedPropertyManagement, true},
+		{"RateLimitingBehavior", TestRateLimitingBehavior, false},
 
 		// Combined streams tests
 		{"CombinedStreamEventReception", TestCombinedStreamEventReception, true},

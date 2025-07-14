@@ -172,6 +172,12 @@ func (s *FullIntegrationTestSuite) TestComprehensiveWorkflow() {
 		})
 	}
 
+	// Step 10: Test comprehensive user data flow from UserDataTestSuite
+	s.Run("10_ComprehensiveUserDataFlow", func() {
+		log.Println("🔄 Step 10: Running comprehensive user data flow test...")
+		s.testComprehensiveUserDataFlow()
+	})
+
 	log.Println("\n✅ === Comprehensive Workflow Test Completed ===")
 }
 
@@ -374,4 +380,49 @@ func (s *FullIntegrationTestSuite) waitForResponse(done chan bool, timeout time.
 	case <-time.After(timeout):
 		s.T().Error("Operation timed out")
 	}
+}
+
+func (s *FullIntegrationTestSuite) testComprehensiveUserDataFlow() {
+	log.Println("Starting comprehensive user data flow test...")
+
+	// 1. Start user data stream
+	listenKey := s.startUserDataStream()
+	s.Require().NotEmpty(listenKey, "Listen key should be set after start")
+
+	// 2. Query account balance
+	s.checkAccountBalance()
+
+	// 3. Query account position with specific pair
+	s.checkAccountPositionWithPair()
+
+	// 4. Query account status
+	s.checkAccountStatus()
+
+	// 5. Ping the stream
+	s.pingUserDataStream(listenKey)
+
+	// 6. Stop the stream
+	s.stopUserDataStream(listenKey)
+
+	log.Println("✅ Comprehensive user data flow completed successfully")
+}
+
+func (s *FullIntegrationTestSuite) checkAccountPositionWithPair() {
+	done := make(chan bool)
+	request := models.NewAccountPositionRequest().SetPair("BTCUSD")
+
+	err := s.client.SendAccountPosition(s.getAuthContext(), request, func(response *models.AccountPositionResponse, err error) error {
+		defer close(done)
+		s.Require().NoError(err, "Account position request failed")
+		s.Require().NotNil(response.Result)
+		
+		if response.Result != nil {
+			log.Printf("Found %d positions for BTCUSD pair", len(response.Result))
+		}
+		return nil
+	})
+
+	s.Require().NoError(err)
+	s.waitForResponse(done, defaultTimeout)
+	time.Sleep(rateLimitDelay)
 }

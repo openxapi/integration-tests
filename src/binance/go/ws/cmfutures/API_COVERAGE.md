@@ -32,7 +32,7 @@ This document tracks the implementation coverage of integration tests for the Bi
 |-----------|--------------|-------|
 | account_test.go | account.balance, account.position, account.status | 3 |
 | trading_test.go | order.place, order.modify, order.cancel, order.status | 4 |
-| userdata_test.go | userDataStream.start, userDataStream.ping, userDataStream.stop | 3 |
+| userdata_test.go | userDataStream.start, userDataStream.ping, userDataStream.stop, account.balance, account.position, account.status | 6 |
 | **Total** | **All APIs** | **10** |
 
 ## Notes
@@ -43,14 +43,15 @@ This document tracks the implementation coverage of integration tests for the Bi
 
 ## Progress Tracking
 
-Last Updated: 2025-07-08
+Last Updated: 2025-07-13
 
 ### Completed:
 1. ✅ Created initial project structure (go.mod, env.example, README.md, main_test.go)
 2. ✅ Implemented account API tests (account.balance, account.position, account.status)
 3. ✅ Implemented trading API tests (order.place, order.modify, order.cancel, order.status)
 4. ✅ Implemented user data stream tests (start, ping, stop)
-5. ✅ Created comprehensive integration test suite
+5. ✅ Enhanced user data stream tests with account query operations
+6. ✅ Created comprehensive integration test suite
 
 ### Test Features:
 - Full error handling with detailed API error reporting
@@ -59,3 +60,5 @@ Last Updated: 2025-07-08
 - Verbose logging option for debugging
 - Test helpers for common operations
 - Complete workflow testing in integration suite
+- User data stream lifecycle testing with account operations
+- Comprehensive user data flow testing combining streams and account queries

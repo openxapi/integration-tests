@@ -355,3 +355,140 @@ func (s *UserDataTestSuite) stopUserDataStreamInTest() {
 	s.waitForResponse(done, defaultTimeout, "userDataStream.stop in lifecycle")
 	time.Sleep(rateLimitDelay)
 }
+
+// TestAccountBalance tests the account.balance endpoint
+func (s *UserDataTestSuite) TestAccountBalance() {
+	s.requireAuth()
+
+	done := make(chan bool)
+	request := models.NewAccountBalanceRequest()
+
+	s.logVerbose("Requesting account balance")
+
+	err := s.client.SendAccountBalance(s.getTestContext(), request, func(response *models.AccountBalanceResponse, err error) error {
+		defer close(done)
+
+		if err != nil {
+			s.handleAPIError(err, "account.balance")
+			return err
+		}
+
+		// Validate response
+		s.Require().NotNil(response, "Response should not be nil")
+		s.Require().NotEmpty(response.Id, "Response ID should not be empty")
+		s.Require().Equal(int64(200), response.Status, "Response status should be 200")
+
+		// Log balance details
+		s.logVerbose("Account balance response: %s", formatJSON(response))
+		log.Printf("💰 Account balance retrieved successfully")
+
+		return nil
+	})
+
+	s.Require().NoError(err, "Failed to send account.balance request")
+	s.waitForResponse(done, defaultTimeout, "account.balance")
+
+	// Rate limit delay
+	time.Sleep(rateLimitDelay)
+}
+
+// TestAccountPosition tests the account.position endpoint
+func (s *UserDataTestSuite) TestAccountPosition() {
+	s.requireAuth()
+
+	done := make(chan bool)
+	request := models.NewAccountPositionRequest().SetPair("BTCUSD")
+
+	s.logVerbose("Requesting account position for BTCUSD pair")
+
+	err := s.client.SendAccountPosition(s.getTestContext(), request, func(response *models.AccountPositionResponse, err error) error {
+		defer close(done)
+
+		if err != nil {
+			s.handleAPIError(err, "account.position")
+			return err
+		}
+
+		// Validate response
+		s.Require().NotNil(response, "Response should not be nil")
+		s.Require().NotEmpty(response.Id, "Response ID should not be empty")
+		s.Require().Equal(int64(200), response.Status, "Response status should be 200")
+
+		// Log position details
+		s.logVerbose("Account position response: %s", formatJSON(response))
+		log.Printf("📈 Account position retrieved successfully")
+
+		return nil
+	})
+
+	s.Require().NoError(err, "Failed to send account.position request")
+	s.waitForResponse(done, defaultTimeout, "account.position")
+
+	// Rate limit delay
+	time.Sleep(rateLimitDelay)
+}
+
+// TestAccountStatus tests the account.status endpoint
+func (s *UserDataTestSuite) TestAccountStatus() {
+	s.requireAuth()
+
+	done := make(chan bool)
+	request := models.NewAccountStatusRequest()
+
+	s.logVerbose("Requesting account status")
+
+	err := s.client.SendAccountStatus(s.getTestContext(), request, func(response *models.AccountStatusResponse, err error) error {
+		defer close(done)
+
+		if err != nil {
+			s.handleAPIError(err, "account.status")
+			return err
+		}
+
+		// Validate response
+		s.Require().NotNil(response, "Response should not be nil")
+		s.Require().NotEmpty(response.Id, "Response ID should not be empty")
+		s.Require().Equal(int64(200), response.Status, "Response status should be 200")
+
+		// Log status details
+		s.logVerbose("Account status response: %s", formatJSON(response))
+		log.Printf("ℹ️ Account status retrieved successfully")
+
+		return nil
+	})
+
+	s.Require().NoError(err, "Failed to send account.status request")
+	s.waitForResponse(done, defaultTimeout, "account.status")
+
+	// Rate limit delay
+	time.Sleep(rateLimitDelay)
+}
+
+// TestComprehensiveUserDataFlow tests a comprehensive flow of user data operations
+func (s *UserDataTestSuite) TestComprehensiveUserDataFlow() {
+	s.requireAuth()
+
+	s.logVerbose("Starting comprehensive user data flow test")
+
+	// 1. Start user data stream
+	s.TestUserDataStreamStart()
+	s.Require().NotEmpty(s.listenKey, "Listen key should be set after start")
+
+	// 2. Query account balance
+	s.TestAccountBalance()
+
+	// 3. Query account position
+	s.TestAccountPosition()
+
+	// 4. Query account status
+	s.TestAccountStatus()
+
+	// 5. Ping the stream
+	s.pingUserDataStream()
+
+	// 6. Stop the stream
+	s.stopUserDataStreamInTest()
+	s.Assert().Empty(s.listenKey, "Listen key should be cleared after stop")
+
+	log.Printf("✅ Comprehensive user data flow completed successfully")
+}
