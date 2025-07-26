@@ -112,8 +112,8 @@ func (s *BaseTestSuite) handleAPIError(err error, operation string) {
 	}
 
 	if apiErr, ok := options.IsAPIError(err); ok {
-		s.T().Errorf("%s failed with API error: Status=%d, Code=%d, Message=%s, ID=%s",
-			operation, apiErr.Status, apiErr.Code, apiErr.Message, apiErr.ID)
+		s.T().Errorf("%s failed with API error: Status=%d, Code=%d, Message=%s, Id=%s",
+			operation, apiErr.Status, apiErr.Code, apiErr.Message, apiErr.Id)
 		
 		// Log specific error guidance
 		switch apiErr.Status {

@@ -168,7 +168,6 @@ func TestFullIntegrationSuite(t *testing.T) {
 
 		// Advanced feature tests
 		{"AdvancedPropertyManagement", TestAdvancedPropertyManagement, true},
-		{"RateLimitingBehavior", TestRateLimitingBehavior, false},
 
 		// Combined streams tests
 		{"CombinedStreamEventReception", TestCombinedStreamEventReception, true},

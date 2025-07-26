@@ -251,37 +251,37 @@ func setupClient(config TestConfig) (*spotws.Client, error) {
 
 	// Register essential event handlers to prevent "No handler found" errors
 	// These handlers are needed for any WebSocket operations that might trigger events
-	client.HandleEventStreamTerminated(func(event *models.EventStreamTerminated) error {
+	client.HandleEventStreamTerminatedEvent(func(event *models.EventStreamTerminatedEvent) error {
 		// Silent handler to prevent "No handler found" log messages
 		return nil
 	})
 
-	client.HandleOutboundAccountPosition(func(event *models.OutboundAccountPosition) error {
+	client.HandleOutboundAccountPositionEvent(func(event *models.OutboundAccountPositionEvent) error {
 		// Silent handler for account position events
 		return nil
 	})
 
-	client.HandleBalanceUpdate(func(event *models.BalanceUpdate) error {
+	client.HandleBalanceUpdateEvent(func(event *models.BalanceUpdateEvent) error {
 		// Silent handler for balance update events
 		return nil
 	})
 
-	client.HandleExecutionReport(func(event *models.ExecutionReport) error {
+	client.HandleExecutionReportEvent(func(event *models.ExecutionReportEvent) error {
 		// Silent handler for execution report events
 		return nil
 	})
 
-	client.HandleListStatus(func(event *models.ListStatus) error {
+	client.HandleListStatusEvent(func(event *models.ListStatusEvent) error {
 		// Silent handler for list status events
 		return nil
 	})
 
-	client.HandleListenKeyExpired(func(event *models.ListenKeyExpired) error {
+	client.HandleListenKeyExpiredEvent(func(event *models.ListenKeyExpiredEvent) error {
 		// Silent handler for listen key expired events
 		return nil
 	})
 
-	client.HandleExternalLockUpdate(func(event *models.ExternalLockUpdate) error {
+	client.HandleExternalLockUpdateEvent(func(event *models.ExternalLockUpdateEvent) error {
 		// Silent handler for external lock update events
 		return nil
 	})

@@ -339,7 +339,7 @@ func (s *FullIntegrationTestSuite) testErrorHandling() {
 		Status:  400,
 		Code:    1001,
 		Message: "Test error",
-		ID:      "test123",
+		Id:      "test123",
 	}
 	
 	apiErr, isAPI := pmargin.IsAPIError(testErr)

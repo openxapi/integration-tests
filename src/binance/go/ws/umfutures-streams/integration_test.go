@@ -568,6 +568,23 @@ func setupAndConnectClient(t *testing.T) *StreamTestClient {
 			return client // Success
 		}
 		
+		// If we get "already connected" error, create a completely new client
+		if strings.Contains(err.Error(), "already connected") {
+			t.Logf("Client already connected, creating new client instance...")
+			
+			// Try to disconnect the old client first
+			client.Disconnect()
+			time.Sleep(500 * time.Millisecond)
+			
+			// Create a completely new client instance
+			client = createTestClient(t)
+			client.SetupEventHandlers()
+			
+			// Small delay for cleanup
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		
 		if attempt < maxRetries {
 			t.Logf("Connection attempt %d failed: %v, retrying...", attempt, err)
 			time.Sleep(time.Duration(attempt) * time.Second) // Exponential backoff
