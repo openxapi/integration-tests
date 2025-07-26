@@ -50,6 +50,12 @@ func TestInvalidStreamNames(t *testing.T) {
 		t.Skip("Skipping invalid stream names test in short mode")
 	}
 
+	// Create a single connected client to be reused for all invalid stream tests
+	client, isDedicated := setupTestClient(t)
+	if isDedicated {
+		defer client.Disconnect()
+	}
+
 	ctx := context.Background()
 
 	// Test various invalid stream formats
@@ -66,11 +72,22 @@ func TestInvalidStreamNames(t *testing.T) {
 
 	for _, invalidStream := range invalidStreams {
 		t.Run("invalid_"+invalidStream, func(t *testing.T) {
-			// Create a new client for each test to avoid connection pollution
-			client := setupAndConnectClient(t)
-			// Note: Don't disconnect shared client - let TestMain handle cleanup
+			// Clear any previous events for this subtest
+			client.ClearEvents()
 			
-			// Try to subscribe to invalid stream
+			// Check if client is still connected and reconnect if needed
+			if !client.IsConnected() {
+				t.Logf("Client disconnected, reconnecting before testing invalid stream '%s'", invalidStream)
+				connectCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				if err := client.Connect(connectCtx); err != nil {
+					cancel()
+					t.Fatalf("Failed to reconnect client: %v", err)
+				}
+				cancel()
+				t.Logf("Successfully reconnected client")
+			}
+			
+			// Try to subscribe to invalid stream using the connected client
 			err := client.Subscribe(ctx, []string{invalidStream})
 			
 			// The subscription might succeed but no events should be received
@@ -92,9 +109,6 @@ func TestInvalidStreamNames(t *testing.T) {
 				// Try to unsubscribe (may fail if connection was closed)
 				client.Unsubscribe(ctx, []string{invalidStream})
 			}
-			
-			// Clear any events for next test
-			client.ClearEvents()
 		})
 	}
 }

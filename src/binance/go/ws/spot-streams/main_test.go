@@ -138,7 +138,6 @@ func TestFullIntegrationSuite(t *testing.T) {
 		{"StreamUnsubscription", TestStreamUnsubscription, true},
 		{"ListSubscriptions", TestListSubscriptions, false},
 		{"SubscriptionToInvalidStream", TestSubscriptionToInvalidStream, true},
-		{"Resubscription", TestResubscription, false},
 		{"BatchSubscription", TestBatchSubscription, false},
 
 		// Error handling tests

@@ -196,8 +196,8 @@ func TestSubscriptionResponseHandler(t *testing.T) {
 	
 	client.OnSubscriptionResponse(func(response *models.SubscriptionResponse) error {
 		responsesReceived++
-		t.Logf("Received SubscriptionResponse #%d: RequestIdEcho=%d, Result=%v", 
-			responsesReceived, response.RequestIdEcho, response.AlwaysNullForSuccessfulSubscription)
+		t.Logf("Received SubscriptionResponse #%d: Id=%s, Result=%v", 
+			responsesReceived, response.Id, response.AlwaysNullForSuccessfulSubscription)
 		return nil
 	})
 

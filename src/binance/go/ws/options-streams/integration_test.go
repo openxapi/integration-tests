@@ -178,7 +178,7 @@ func (stc *StreamTestClient) Connect(ctx context.Context) error {
 	}
 
 	// Use ConnectWithVariables to properly resolve the template URL
-	err := stc.client.ConnectWithVariables(ctx, "/ws")
+	err := stc.client.ConnectWithVariables(ctx, "ws")
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (stc *StreamTestClient) ConnectToCombinedStreams(ctx context.Context) error
 	}
 
 	// Use ConnectWithVariables to properly resolve the template URL
-	err := stc.client.ConnectWithVariables(ctx, "/stream")
+	err := stc.client.ConnectWithVariables(ctx, "stream")
 	if err != nil {
 		return err
 	}
@@ -588,6 +588,28 @@ func setupTestClient(t *testing.T) (*StreamTestClient, bool) {
 			
 			if err == nil {
 				break
+			}
+			
+			// If we get "already connected" error, create a completely new client
+			if strings.Contains(err.Error(), "already connected") {
+				t.Logf("Client already connected, creating new client instance...")
+				
+				// Try to disconnect the old client first
+				client.Disconnect()
+				time.Sleep(500 * time.Millisecond)
+				
+				// Create a completely new client instance
+				config := getTestConfig()
+				newClient, createErr := NewStreamTestClientDedicated(config)
+				if createErr != nil {
+					t.Fatalf("Failed to create new dedicated test client: %v", createErr)
+				}
+				newClient.SetupEventHandlers()
+				client = newClient
+				
+				// Small delay for cleanup
+				time.Sleep(500 * time.Millisecond)
+				continue
 			}
 			
 			if attempt < maxRetries {

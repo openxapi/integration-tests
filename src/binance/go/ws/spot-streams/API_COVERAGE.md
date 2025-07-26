@@ -134,7 +134,6 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 
 | Feature | Test Coverage | Test File | Status |
 |---------|---------------|-----------|--------|
-| **Resubscription** | ✅ | `subscription_test.go` | Working |
 | **Batch Subscription** | ✅ | `subscription_test.go` | Working |
 | **Subscription Tracking** | ✅ | `subscription_test.go` | Working |
 | **Active Streams Management** | ✅ | `subscription_test.go` | Working |

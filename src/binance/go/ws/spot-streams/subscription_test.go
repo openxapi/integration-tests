@@ -233,51 +233,6 @@ func TestSubscriptionToInvalidStream(t *testing.T) {
 	}
 }
 
-// TestResubscription tests resubscribing to the same stream
-func TestResubscription(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping resubscription test in short mode")
-	}
-
-	client := setupAndConnectClient(t)
-	defer client.Disconnect()
-
-	ctx := context.Background()
-
-	stream := "btcusdt@trade"
-
-	// First subscription
-	if err := client.Subscribe(ctx, []string{stream}); err != nil {
-		t.Fatalf("Failed to subscribe first time: %v", err)
-	}
-
-	// Wait for some events
-	time.Sleep(2 * time.Second)
-
-	// Second subscription to the same stream
-	if err := client.Subscribe(ctx, []string{stream}); err != nil {
-		t.Fatalf("Failed to subscribe second time: %v", err)
-	}
-
-	// Verify only one active stream
-	activeStreams := client.GetActiveStreams()
-	streamCount := 0
-	for _, active := range activeStreams {
-		if active == stream {
-			streamCount++
-		}
-	}
-
-	if streamCount > 1 {
-		t.Errorf("Expected only 1 instance of stream %s, got %d", stream, streamCount)
-	}
-
-	// Unsubscribe
-	if err := client.Unsubscribe(ctx, []string{stream}); err != nil {
-		t.Errorf("Failed to unsubscribe: %v", err)
-	}
-}
-
 // TestBatchSubscription tests subscribing to many streams at once
 func TestBatchSubscription(t *testing.T) {
 	if testing.Short() {

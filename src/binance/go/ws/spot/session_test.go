@@ -627,31 +627,31 @@ func testUserDataStreamUnsubscribe(client *spotws.Client, config TestConfig) err
 
 func testUserDataEventHandlers(client *spotws.Client, config TestConfig) error {
 	// Test event handler registrations
-	client.HandleOutboundAccountPosition(func(event *models.OutboundAccountPosition) error {
+	client.HandleOutboundAccountPositionEvent(func(event *models.OutboundAccountPositionEvent) error {
 		return nil
 	})
 
-	client.HandleBalanceUpdate(func(event *models.BalanceUpdate) error {
+	client.HandleBalanceUpdateEvent(func(event *models.BalanceUpdateEvent) error {
 		return nil
 	})
 
-	client.HandleExecutionReport(func(event *models.ExecutionReport) error {
+	client.HandleExecutionReportEvent(func(event *models.ExecutionReportEvent) error {
 		return nil
 	})
 
-	client.HandleListStatus(func(event *models.ListStatus) error {
+	client.HandleListStatusEvent(func(event *models.ListStatusEvent) error {
 		return nil
 	})
 
-	client.HandleListenKeyExpired(func(event *models.ListenKeyExpired) error {
+	client.HandleListenKeyExpiredEvent(func(event *models.ListenKeyExpiredEvent) error {
 		return nil
 	})
 
-	client.HandleExternalLockUpdate(func(event *models.ExternalLockUpdate) error {
+	client.HandleExternalLockUpdateEvent(func(event *models.ExternalLockUpdateEvent) error {
 		return nil
 	})
 
-	client.HandleEventStreamTerminated(func(event *models.EventStreamTerminated) error {
+	client.HandleEventStreamTerminatedEvent(func(event *models.EventStreamTerminatedEvent) error {
 		return nil
 	})
 

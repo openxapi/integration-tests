@@ -278,31 +278,31 @@ func setupClient(config TestConfig) (*umfuturesws.Client, error) {
 
 	// Register event handlers to prevent "No handler found" errors
 	// These are silent handlers that simply prevent warnings
-	client.HandleAccountConfigUpdate(func(event *models.AccountConfigUpdate) error {
+	client.HandleAccountConfigUpdateEvent(func(event *models.AccountConfigUpdateEvent) error {
 		return nil
 	})
-	client.HandleAccountUpdate(func(event *models.AccountUpdate) error {
+	client.HandleAccountUpdateEvent(func(event *models.AccountUpdateEvent) error {
 		return nil
 	})
-	client.HandleOrderTradeUpdate(func(event *models.OrderTradeUpdate) error {
+	client.HandleOrderTradeUpdateEvent(func(event *models.OrderTradeUpdateEvent) error {
 		return nil
 	})
-	client.HandleConditionalOrderTriggerReject(func(event *models.ConditionalOrderTriggerReject) error {
+	client.HandleConditionalOrderTriggerRejectEvent(func(event *models.ConditionalOrderTriggerRejectEvent) error {
 		return nil
 	})
-	client.HandleGridUpdate(func(event *models.GridUpdate) error {
+	client.HandleGridUpdateEvent(func(event *models.GridUpdateEvent) error {
 		return nil
 	})
-	client.HandleListenKeyExpired(func(event *models.ListenKeyExpired) error {
+	client.HandleListenKeyExpiredEvent(func(event *models.ListenKeyExpiredEvent) error {
 		return nil
 	})
-	client.HandleMarginCall(func(event *models.MarginCall) error {
+	client.HandleMarginCallEvent(func(event *models.MarginCallEvent) error {
 		return nil
 	})
-	client.HandleStrategyUpdate(func(event *models.StrategyUpdate) error {
+	client.HandleStrategyUpdateEvent(func(event *models.StrategyUpdateEvent) error {
 		return nil
 	})
-	client.HandleTradeLite(func(event *models.TradeLite) error {
+	client.HandleTradeLiteEvent(func(event *models.TradeLiteEvent) error {
 		return nil
 	})
 

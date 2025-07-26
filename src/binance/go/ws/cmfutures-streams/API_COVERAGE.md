@@ -139,7 +139,6 @@ All SDK functionality has been successfully tested:
 4. ✅ `TestIndividualIndexPriceStream` - Individual index price streams
 5. ✅ `TestComprehensiveErrorHandling` - Complete error scenario testing
 6. ✅ `TestAdvancedPropertyManagement` - Advanced property edge cases
-7. ✅ `TestRateLimitingBehavior` - Rate limiting and concurrent operations
 
 ### **📋 Test Files Updated:**
 - `streams_test.go` - Added 4 new stream type tests

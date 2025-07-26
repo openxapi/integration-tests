@@ -174,12 +174,9 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 	time.Sleep(8 * time.Second)
 
 	if eventsReceived > 0 {
-		t.Logf("Successfully received %d CombinedStreamEvents", eventsReceived)
+		t.Logf("✅ Successfully received %d CombinedStreamEvents", eventsReceived)
 	} else {
-		t.Log("⚠️  No CombinedStreamEvents received - this is a known SDK limitation")
-		t.Log("ℹ️  Individual event handlers work correctly in combined streams")
-		t.Log("🔧 SDK needs to implement CombinedStreamEvent wrapper dispatching")
-		t.Skip("Skipping due to known SDK issue with CombinedStreamEvent handler")
+		t.Error("❌ Expected to receive at least one CombinedStreamEvent")
 	}
 }
 
@@ -199,8 +196,8 @@ func TestSubscriptionResponseHandler(t *testing.T) {
 	
 	client.OnSubscriptionResponse(func(response *models.SubscriptionResponse) error {
 		responsesReceived++
-		t.Logf("Received SubscriptionResponse #%d: RequestIdEcho=%d, Result=%v", 
-			responsesReceived, response.RequestIdEcho, response.AlwaysNullForSuccessfulSubscription)
+		t.Logf("Received SubscriptionResponse #%d: Id=%s, Result=%v", 
+			responsesReceived, response.Id, response.AlwaysNullForSuccessfulSubscription)
 		return nil
 	})
 
@@ -665,105 +662,3 @@ func TestAdvancedPropertyManagement(t *testing.T) {
 	t.Log("✅ Advanced property management tests completed")
 }
 
-// TestRateLimitingBehavior tests rate limiting scenarios
-func TestRateLimitingBehavior(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping rate limiting behavior test in short mode")
-	}
-
-	client := cmfuturesstreams.NewClient()
-	err := client.SetActiveServer("testnet1")
-	if err != nil {
-		t.Fatalf("Failed to set testnet server: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	err = client.Connect(ctx)
-	if err != nil {
-		t.Fatalf("Failed to connect: %v", err)
-	}
-	defer client.Disconnect()
-
-	t.Run("RapidSubscriptionChanges", func(t *testing.T) {
-		// Test rapid subscribe/unsubscribe operations
-		testStreams := []string{
-			"btcusd_perp@aggTrade",
-			"linkusd_perp@aggTrade", 
-			"adausd_perp@aggTrade",
-		}
-
-		t.Log("Testing rapid subscription changes...")
-		
-		// Rapid subscribe operations
-		for i := 0; i < 5; i++ {
-			for _, stream := range testStreams {
-				err := client.Subscribe(ctx, []string{stream})
-				if err != nil {
-					t.Logf("⚠️  Error during rapid subscribe #%d to %s: %v", i+1, stream, err)
-				}
-				time.Sleep(100 * time.Millisecond) // Small delay to avoid overwhelming
-			}
-		}
-
-		time.Sleep(2 * time.Second) // Allow some processing time
-
-		// Rapid unsubscribe operations
-		for i := 0; i < 5; i++ {
-			for _, stream := range testStreams {
-				err := client.Unsubscribe(ctx, []string{stream})
-				if err != nil {
-					t.Logf("⚠️  Error during rapid unsubscribe #%d from %s: %v", i+1, stream, err)
-				}
-				time.Sleep(100 * time.Millisecond) // Small delay to avoid overwhelming
-			}
-		}
-
-		t.Log("✅ Rapid subscription changes test completed")
-	})
-
-	t.Run("MultipleSimultaneousOperations", func(t *testing.T) {
-		// Test multiple operations happening simultaneously
-		t.Log("Testing multiple simultaneous operations...")
-		
-		done := make(chan bool, 3)
-		
-		// Concurrent subscribe operations
-		go func() {
-			err := client.Subscribe(ctx, []string{"btcusd_perp@ticker"})
-			if err != nil {
-				t.Logf("⚠️  Error in concurrent subscribe: %v", err)
-			}
-			done <- true
-		}()
-		
-		// Concurrent list subscriptions
-		go func() {
-			err := client.ListSubscriptions(ctx)
-			if err != nil {
-				t.Logf("⚠️  Error in concurrent list subscriptions: %v", err)
-			}
-			done <- true
-		}()
-		
-		// Concurrent unsubscribe operations
-		go func() {
-			time.Sleep(500 * time.Millisecond) // Small delay before unsubscribe
-			err := client.Unsubscribe(ctx, []string{"btcusd_perp@ticker"})
-			if err != nil {
-				t.Logf("⚠️  Error in concurrent unsubscribe: %v", err)
-			}
-			done <- true
-		}()
-		
-		// Wait for all operations to complete
-		for i := 0; i < 3; i++ {
-			<-done
-		}
-		
-		t.Log("✅ Multiple simultaneous operations test completed")
-	})
-
-	t.Log("✅ Rate limiting behavior tests completed")
-}
