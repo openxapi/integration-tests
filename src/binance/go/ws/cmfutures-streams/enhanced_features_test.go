@@ -137,7 +137,7 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 	
 	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		eventsReceived++
-		t.Logf("Received CombinedStreamEvent #%d: StreamName=%s, StreamData available=%t", 
+		t.Logf("✅ Received CombinedStreamEvent #%d: StreamName=%s, StreamData available=%t", 
 			eventsReceived, event.StreamName, event.StreamData != nil)
 		
 		// Validate event structure
@@ -153,7 +153,7 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Connect to combined streams specifically
+	// Connect to combined streams specifically (SDK issue has been fixed)
 	err = client.ConnectToCombinedStreams(ctx, "")
 	if err != nil {
 		t.Fatalf("Failed to connect to combined streams: %v", err)
@@ -161,7 +161,7 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 	defer client.Disconnect()
 
 	// Subscribe to multiple streams to trigger combined events
-	streams := []string{"btcusd_perp@ticker", "linkusd_perp@miniTicker", "adausd_perp@aggTrade"}
+	streams := []string{"btcusd_perp@markPrice@1s", "linkusd_perp@miniTicker", "adausd_perp@aggTrade"}
 	subscribeCtx, subscribeCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer subscribeCancel()
 

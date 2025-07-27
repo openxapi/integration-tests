@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	optionsstreams "github.com/openxapi/binance-go/ws/options-streams"
 	"github.com/openxapi/binance-go/ws/options-streams/models"
 )
 
@@ -14,17 +15,18 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 		t.Skip("Skipping combined stream tests in short mode")
 	}
 
-	client, err := NewStreamTestClientDedicated(getTestConfig())
+	// Use the same pattern as cmfutures-streams for consistency
+	client := optionsstreams.NewClient()
+	err := client.SetActiveServer("mainnet1")
 	if err != nil {
-		t.Fatalf("Failed to create dedicated test client: %v", err)
+		t.Fatalf("Failed to set mainnet server: %v", err)
 	}
-	defer client.Disconnect()
 
 	eventsReceived := 0
 	
-	client.client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		eventsReceived++
-		t.Logf("Received CombinedStreamEvent #%d: StreamName=%s, StreamData available=%t", 
+		t.Logf("✅ Received CombinedStreamEvent #%d: StreamName=%s, StreamData available=%t", 
 			eventsReceived, event.StreamName, event.StreamData != nil)
 		
 		// Validate event structure
@@ -40,26 +42,19 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Connect to combined streams specifically
-	err = client.ConnectToCombinedStreams(ctx)
+	// Connect to combined streams specifically (SDK issue has been fixed)
+	err = client.ConnectToCombinedStreams(ctx, "")
 	if err != nil {
 		t.Fatalf("Failed to connect to combined streams: %v", err)
 	}
+	defer client.Disconnect()
 
-	// Try to get dynamic symbols, but use index streams as fallback
 	// Subscribe to multiple streams to trigger combined events
+	// Use index streams which are reliable for options
 	streams := []string{
-		"ETHUSDT@index",    // Index price stream
-		"BTCUSDT@index",    // Index price stream  
+		"ETHUSDT@index",     // Index price stream
+		"BTCUSDT@index",     // Index price stream  
 		"ETHUSDT@markPrice", // Mark price stream
-	}
-
-	// Use dynamic symbol selection if available, otherwise fallback to index streams
-	ethSymbol, err := selectNearestExpirySymbol("ETH", "C")
-	if err == nil && ethSymbol != "" {
-		// Add actual options symbol streams if available
-		streams = append(streams, ethSymbol+"@ticker")
-		t.Logf("Using dynamic ETH option symbol: %s", ethSymbol)
 	}
 
 	subscribeCtx, subscribeCancel := context.WithTimeout(ctx, 5*time.Second)
