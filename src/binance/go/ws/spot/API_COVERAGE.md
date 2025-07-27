@@ -4,11 +4,12 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 
 ## Coverage Summary
 
-- **Total APIs**: 40+ endpoints
-- **APIs Tested**: 40 endpoints
-- **Coverage**: ~100%
+- **Total APIs**: 41 endpoints
+- **APIs Tested**: 41 endpoints
+- **Coverage**: 100%
 - **Test Files**: 4 comprehensive test files
 - **Authentication Methods**: 3 (HMAC, RSA, Ed25519)
+- **Latest Test Run**: All 91 tests passed (100% success rate)
 
 ## API Categories and Coverage
 
@@ -42,7 +43,7 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 | `orderList.place.oco` | `TestOrderListPlaceOCO` | `trading_test.go` | ✅ |
 | `orderList.place.oto` | `TestOrderListPlaceOTO` | `trading_test.go` | ✅ |
 
-### 🔐 Session Management APIs (7/7) - 100%
+### 🔐 Session Management APIs (8/8) - 100%
 | API Endpoint | Test Function | Test File | Status |
 |--------------|---------------|-----------|---------|
 | `session.logon` | `TestSessionLogon` | `session_test.go` | ✅ |
@@ -52,6 +53,7 @@ This document tracks the integration test coverage for the Binance Spot WebSocke
 | `userDataStream.ping` | `TestUserDataStreamPing` | `session_test.go` | ✅ |
 | `userDataStream.stop` | `TestUserDataStreamStop` | `session_test.go` | ✅ |
 | `userDataStream.subscribe` | `TestUserDataStreamEvents` | `session_test.go` | ✅ |
+| `userDataStream.unsubscribe` | `TestUserDataStreamUnsubscribe` | `session_test.go` | ✅ |
 
 ### 👤 User Data APIs (12/12) - 100%
 | API Endpoint | Test Function | Test File | Status |
@@ -167,4 +169,5 @@ This coverage document should be updated when:
 - Authentication methods are added or changed
 
 **Last Updated**: July 2025
-**Test Coverage**: 100% (40/40 endpoints)
+**Test Coverage**: 100% (41/41 endpoints)
+**Latest Test Results**: 91 tests passed, 0 failed (100% success rate, 3m24s duration)
