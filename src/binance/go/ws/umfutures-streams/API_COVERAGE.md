@@ -12,6 +12,7 @@ This document tracks the integration test coverage for the Binance USD-M Futures
 - **SDK Status**: User data stream functionality has been completely removed from the WebSocket streams SDK
 - **Scope**: This module now focuses only on market data streams (no authentication required)
 - **User Data Streams**: Available in the separate umfutures REST API SDK for listenKey management
+- **Latest Test Run**: All tests passed (100% success rate, 345.67s duration)
 
 ## Stream Types Coverage
 

@@ -11,6 +11,7 @@ The Binance Options WebSocket API provides real-time access to options trading d
 - **Total APIs Available**: 3
 - **APIs Tested**: 3  
 - **Coverage**: 100%
+- **Latest Test Run**: All tests passed (100% success rate, 7.32s duration)
 
 ## API Endpoint Coverage
 

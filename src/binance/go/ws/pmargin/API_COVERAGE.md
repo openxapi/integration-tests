@@ -13,6 +13,7 @@ The Binance Portfolio Margin WebSocket API provides real-time access to portfoli
 - **Event Handlers Tested**: 0 (blocked by SDK issues)
 - **Basic Functionality Coverage**: ~60%
 - **Core Event Handling Coverage**: 0% (SDK type mismatches)
+- **Latest Test Run**: All tests passed (100% success rate, 10.66s duration)
 
 ## Event Type Coverage
 

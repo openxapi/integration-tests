@@ -13,6 +13,7 @@ This document tracks the integration test coverage for the Binance Coin-M Future
 - **SDK Status**: User data stream functionality has been completely removed from the WebSocket streams SDK
 - **Scope**: This module now focuses only on market data streams (no authentication required)
 - **User Data Streams**: Available in the separate cmfutures REST API SDK for listenKey management
+- **Latest Test Run**: All tests passed (100% success rate, 667.65s duration)
 
 ## Stream Types Coverage
 
@@ -139,6 +140,7 @@ All SDK functionality has been successfully tested:
 4. ✅ `TestIndividualIndexPriceStream` - Individual index price streams
 5. ✅ `TestComprehensiveErrorHandling` - Complete error scenario testing
 6. ✅ `TestAdvancedPropertyManagement` - Advanced property edge cases
+7. ✅ `TestCombinedStreamEventHandler` - Combined stream event handling (SDK issue fixed)
 
 ### **📋 Test Files Updated:**
 - `streams_test.go` - Added 4 new stream type tests

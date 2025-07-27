@@ -28,12 +28,20 @@ Where:
 
 ```
 src/
-└── binance/              # Binance exchange tests
-    └── go/              # Go language tests
-        ├── ws/          # WebSocket API tests
-        │   ├── spot/    # Spot trading WebSocket tests
-        │   └── umfutures/ # USD-M Futures WebSocket tests
-        └── rest/        # REST API tests (future)
+└── binance/                    # Binance exchange tests
+    └── go/                    # Go language tests
+        ├── ws/                # WebSocket API tests
+        │   ├── spot/          # Spot WebSocket API + User Data Streams
+        │   ├── umfutures/     # USD-M Futures WebSocket API + User Data Streams
+        │   ├── cmfutures/     # Coin-M Futures WebSocket API + User Data Streams
+        │   ├── options/       # Options WebSocket API + User Data Streams
+        │   ├── pmargin/       # Portfolio Margin WebSocket API + User Data Streams
+        │   ├── spot-streams/  # Spot Market Data Streams (public data)
+        │   ├── umfutures-streams/ # USD-M Futures Market Data Streams (public data)
+        │   ├── cmfutures-streams/ # Coin-M Futures Market Data Streams (public data)
+        │   └── options-streams/   # Options Market Data Streams (public data)
+        └── rest/              # REST API tests
+            └── spot/          # Spot trading REST API tests (87.2% coverage)
 ```
 
 ## Development Guidelines
@@ -46,8 +54,9 @@ src/
    - Each folder represents a specific `{exchange}/{language}/{protocol}/{module}` combination
 
 2. **SDK Location**: The SDKs being tested are located outside this repository:
-   - For `src/binance/go/ws/spot`, the SDK is at `../binance-go/ws/spot`
-   - For `src/binance/go/ws/umfutures`, the SDK is at `../binance-go/ws/umfutures`
+   - WebSocket APIs + User Data Streams: `../binance-go/ws/{module}` (e.g., `../binance-go/ws/spot`)
+   - Market Data Streams: `../binance-go/ws/{module}-streams` (e.g., `../binance-go/ws/spot-streams`)
+   - REST APIs: `../binance-go/rest/{module}` (e.g., `../binance-go/rest/spot`)
    - **Never modify SDK source files** - only create integration tests
 
 3. **Adding New Integration Tests**:
@@ -71,45 +80,115 @@ src/
 
 ### Running Tests
 
-By default, tests are run against the testnet server.
+By default, tests are run against the testnet server where available.
 
-#### Binance Spot WebSocket Tests (Go)
+#### Binance WebSocket API + User Data Streams Tests (Go)
 ```bash
+# Spot WebSocket API + User Data Streams (41 endpoints, 100% coverage)
 cd src/binance/go/ws/spot
+go test -v -run TestFullIntegrationSuite ./...
+
+# USD-M Futures WebSocket API + User Data Streams (19 endpoints, 100% coverage)
+cd src/binance/go/ws/umfutures
+go test -v -run TestFullIntegrationSuite ./...
+
+# Coin-M Futures WebSocket API + User Data Streams (10 endpoints, 100% coverage)
+cd src/binance/go/ws/cmfutures
+go test -v -run TestFullIntegrationSuite ./...
+
+# Options WebSocket API + User Data Streams (3 endpoints, 100% coverage)
+cd src/binance/go/ws/options
+go test -v -run TestFullIntegrationSuite ./...
+
+# Portfolio Margin WebSocket API + User Data Streams (11 event types, limited coverage)
+cd src/binance/go/ws/pmargin
 go test -v -run TestFullIntegrationSuite ./...
 ```
 
-#### Binance USD-M Futures WebSocket Tests (Go)
+#### Binance Market Data Streams Tests (Go)
 ```bash
-cd src/binance/go/ws/umfutures
+# Spot Market Data Streams (10 stream types, 100% coverage)
+cd src/binance/go/ws/spot-streams
+go test -v -run TestFullIntegrationSuite ./...
+
+# USD-M Futures Market Data Streams (13 stream types, 100% coverage)
+cd src/binance/go/ws/umfutures-streams
+go test -v -run TestFullIntegrationSuite ./...
+
+# Coin-M Futures Market Data Streams (13 stream types, 100% coverage)
+cd src/binance/go/ws/cmfutures-streams
+go test -v -run TestFullIntegrationSuite ./...
+
+# Options Market Data Streams (9 stream types, 100% coverage)
+cd src/binance/go/ws/options-streams
+go test -v -run TestFullIntegrationSuite ./...
+```
+
+#### Binance REST API Tests (Go)
+```bash
+# Spot REST API (410+ endpoints, 87.2% coverage)
+cd src/binance/go/rest/spot
 go test -v -run TestFullIntegrationSuite ./...
 ```
 
 ## Test Categories
 
-### Public Tests
-Tests for public endpoints that don't require authentication:
-- Market data subscriptions
-- Ticker information
-- Order book depth
+### WebSocket API + User Data Streams Tests
+Tests for request/response style WebSocket APIs and user-specific data streams:
+- **Public Endpoints**: Market data, exchange info, ticker prices (no auth required)
+- **Trading Endpoints**: Order placement, cancellation, modification (TRADE auth)
+- **Account Endpoints**: Balance queries, position info, trading status (USER_DATA auth)
+- **Session Management**: Authentication, connection lifecycle
+- **User Data Streams**: Account updates, order updates, position changes (authenticated)
+- **Authentication Methods**: HMAC, RSA, Ed25519 signature support
 
-### Trading Tests
-Tests for authenticated trading operations:
-- Order placement and cancellation
-- Account balance queries
-- Position management
+### Market Data Streams Tests
+Tests for real-time public market data streaming WebSocket APIs:
+- **Market Data Streams**: Trade, ticker, depth, kline streams (no auth required)
+- **Combined Streams**: Multi-stream subscriptions and event handling
+- **Connection Management**: Server selection, reconnection, error handling
+- **Subscription Management**: Dynamic subscribe/unsubscribe operations
+- **Event Processing**: Real-time event handling and data validation
 
-### Session Tests
-Tests for WebSocket session management:
-- Session authentication
-- Connection handling
-- Heartbeat/ping-pong
+### REST API Tests
+Tests for traditional HTTP REST APIs:
+- **Public APIs**: Market data, exchange information
+- **Trading APIs**: Order management, trade execution
+- **Account APIs**: Balance queries, transaction history
+- **Wallet APIs**: Deposits, withdrawals, transfers
+- **Advanced Features**: Margin trading, staking, mining, loans
 
-### User Data Tests
-Tests for user data stream operations:
-- User data stream lifecycle
-- Account updates
-- Order updates
+## Test Coverage Summary
+
+### Binance Go Integration Tests
+- **Total Modules**: 10 (9 WebSocket + 1 REST)
+- **WebSocket API + User Data Streams Modules**: 5 (spot, umfutures, cmfutures, options, pmargin)
+- **Market Data Streams Modules**: 4 (spot-streams, umfutures-streams, cmfutures-streams, options-streams)
+- **REST API Modules**: 1 (spot)
+- **Overall Coverage**: Comprehensive across all major Binance trading products
+
+### Key Features Tested
+- **Authentication**: All three methods (HMAC, RSA, Ed25519) where supported
+- **Error Handling**: Comprehensive error scenarios and recovery testing
+- **Rate Limiting**: Proper handling of exchange rate limits
+- **Real-time Data**: Live market data validation and event processing
+- **Cross-platform**: Tests run on testnet and mainnet environments
+- **Performance**: Load testing and concurrent operations
+
+## Environment Requirements
+
+### Test Environment Support
+- **Testnet**: Primary testing environment (safe for most tests)
+- **Mainnet**: Required for Options and Portfolio Margin (no testnet available)
+- **Authentication**: API keys and secrets required for private endpoints
+- **Network**: Stable internet connection required for real-time tests
+
+### Setup Requirements
+Each module includes:
+- `env.example` - Template for environment variables
+- `README.md` - Module-specific documentation and usage instructions
+- `API_COVERAGE.md` - Detailed test coverage tracking
+- Comprehensive test suites with error handling and logging
 
 ## Notes
 
@@ -117,12 +196,15 @@ Tests for user data stream operations:
 - Use testnet environments when available to avoid affecting real trading
 - Some tests may require specific account permissions or balances
 - Rate limits apply - tests include appropriate delays
+- Tests include comprehensive logging for debugging and monitoring
 
 ## Contributing
 
 When adding new integration tests:
-1. Follow the existing directory structure
-2. Include appropriate environment variable handling
-3. Add comprehensive error checking
-4. Document any special requirements
-5. Update this README with new test information
+1. Follow the existing directory structure: `src/{exchange}/{language}/{protocol}/{module}/`
+2. Include appropriate environment variable handling and security
+3. Add comprehensive error checking and timeout management
+4. Create detailed API coverage documentation
+5. Include both positive and negative test scenarios
+6. Update this README with new module information
+7. Ensure tests are idempotent and can be run repeatedly

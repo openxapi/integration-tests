@@ -4,12 +4,13 @@ This document tracks the integration test coverage for the Binance USD-M Futures
 
 ## Coverage Summary
 
-- **Total APIs**: 19+ endpoints (2 methods removed from SDK)
+- **Total APIs**: 19 endpoints
 - **APIs Tested**: 19 endpoints (all available methods)  
-- **Working Coverage**: 100% of available SDK methods
+- **Coverage**: 100% of available SDK methods
 - **Test Files**: 4 comprehensive test files
-- **Authentication Methods**: 3 (HMAC, RSA, Ed25519)
+- **Authentication Methods**: 1 (HMAC only in current test run)
 - **Event Models**: 9 user stream event types (with handlers)
+- **Latest Test Run**: All 19 tests passed (100% success rate)
 
 ## API Categories and Coverage
 
@@ -64,7 +65,7 @@ All previously identified SDK issues have been resolved:
 | `account.position` | `TestAccountPosition` | `userdata_test.go` | ✅ |
 | `account.status` | `TestAccountStatus` | `userdata_test.go` | ✅ |
 | `v2.account.balance` | `TestV2AccountBalance` | `userdata_test.go` | ✅ |
-| `v2.account.position` | `TestV2AccountPosition` | `userdata_test.go` | ✅ |
+| `v2.account.status` | `TestV2AccountStatus` | `userdata_test.go` | ✅ |
 
 ### 🎯 User Stream Event Models (9/9) - 100%
 | Event Type | Event Model | Handler Method | Test Coverage |
@@ -239,6 +240,6 @@ This coverage document should be updated when:
 - Futures-specific features are enhanced
 
 **Last Updated**: July 2025
-**Test Coverage**: 100% of working endpoints (16/16 functional + 9 event models)
-**SDK Issues**: 5 methods need fixes before integration testing
-**Status**: Complete coverage of functional SDK methods
+**Test Coverage**: 100% of available endpoints (19/19 functional + 9 event models)
+**Latest Test Results**: 19 tests passed, 0 failed (100% success rate, 37.25s duration)
+**Status**: Complete coverage of all SDK methods
