@@ -31,15 +31,15 @@ src/
 └── binance/                    # Binance exchange tests
     └── go/                    # Go language tests
         ├── ws/                # WebSocket API tests
-        │   ├── spot/          # Spot trading WebSocket API tests
-        │   ├── umfutures/     # USD-M Futures WebSocket API tests
-        │   ├── cmfutures/     # Coin-M Futures WebSocket API tests
-        │   ├── options/       # Options WebSocket API tests
-        │   ├── pmargin/       # Portfolio Margin WebSocket API tests
-        │   ├── spot-streams/  # Spot WebSocket Streams tests
-        │   ├── umfutures-streams/ # USD-M Futures WebSocket Streams tests
-        │   ├── cmfutures-streams/ # Coin-M Futures WebSocket Streams tests
-        │   └── options-streams/   # Options WebSocket Streams tests
+        │   ├── spot/          # Spot WebSocket API + User Data Streams
+        │   ├── umfutures/     # USD-M Futures WebSocket API + User Data Streams
+        │   ├── cmfutures/     # Coin-M Futures WebSocket API + User Data Streams
+        │   ├── options/       # Options WebSocket API + User Data Streams
+        │   ├── pmargin/       # Portfolio Margin WebSocket API + User Data Streams
+        │   ├── spot-streams/  # Spot Market Data Streams (public data)
+        │   ├── umfutures-streams/ # USD-M Futures Market Data Streams (public data)
+        │   ├── cmfutures-streams/ # Coin-M Futures Market Data Streams (public data)
+        │   └── options-streams/   # Options Market Data Streams (public data)
         └── rest/              # REST API tests
             └── spot/          # Spot trading REST API tests (87.2% coverage)
 ```
@@ -54,8 +54,8 @@ src/
    - Each folder represents a specific `{exchange}/{language}/{protocol}/{module}` combination
 
 2. **SDK Location**: The SDKs being tested are located outside this repository:
-   - WebSocket APIs: `../binance-go/ws/{module}` (e.g., `../binance-go/ws/spot`)
-   - WebSocket Streams: `../binance-go/ws/{module}-streams` (e.g., `../binance-go/ws/spot-streams`)
+   - WebSocket APIs + User Data Streams: `../binance-go/ws/{module}` (e.g., `../binance-go/ws/spot`)
+   - Market Data Streams: `../binance-go/ws/{module}-streams` (e.g., `../binance-go/ws/spot-streams`)
    - REST APIs: `../binance-go/rest/{module}` (e.g., `../binance-go/rest/spot`)
    - **Never modify SDK source files** - only create integration tests
 
@@ -82,44 +82,44 @@ src/
 
 By default, tests are run against the testnet server where available.
 
-#### Binance WebSocket API Tests (Go)
+#### Binance WebSocket API + User Data Streams Tests (Go)
 ```bash
-# Spot WebSocket API (41 endpoints, 100% coverage)
+# Spot WebSocket API + User Data Streams (41 endpoints, 100% coverage)
 cd src/binance/go/ws/spot
 go test -v -run TestFullIntegrationSuite ./...
 
-# USD-M Futures WebSocket API (19 endpoints, 100% coverage)
+# USD-M Futures WebSocket API + User Data Streams (19 endpoints, 100% coverage)
 cd src/binance/go/ws/umfutures
 go test -v -run TestFullIntegrationSuite ./...
 
-# Coin-M Futures WebSocket API (10 endpoints, 100% coverage)
+# Coin-M Futures WebSocket API + User Data Streams (10 endpoints, 100% coverage)
 cd src/binance/go/ws/cmfutures
 go test -v -run TestFullIntegrationSuite ./...
 
-# Options WebSocket API (3 endpoints, 100% coverage)
+# Options WebSocket API + User Data Streams (3 endpoints, 100% coverage)
 cd src/binance/go/ws/options
 go test -v -run TestFullIntegrationSuite ./...
 
-# Portfolio Margin WebSocket API (11 event types, limited coverage)
+# Portfolio Margin WebSocket API + User Data Streams (11 event types, limited coverage)
 cd src/binance/go/ws/pmargin
 go test -v -run TestFullIntegrationSuite ./...
 ```
 
-#### Binance WebSocket Streams Tests (Go)
+#### Binance Market Data Streams Tests (Go)
 ```bash
-# Spot WebSocket Streams (10 stream types, 100% coverage)
+# Spot Market Data Streams (10 stream types, 100% coverage)
 cd src/binance/go/ws/spot-streams
 go test -v -run TestFullIntegrationSuite ./...
 
-# USD-M Futures WebSocket Streams (13 stream types, 100% coverage)
+# USD-M Futures Market Data Streams (13 stream types, 100% coverage)
 cd src/binance/go/ws/umfutures-streams
 go test -v -run TestFullIntegrationSuite ./...
 
-# Coin-M Futures WebSocket Streams (13 stream types, 100% coverage)
+# Coin-M Futures Market Data Streams (13 stream types, 100% coverage)
 cd src/binance/go/ws/cmfutures-streams
 go test -v -run TestFullIntegrationSuite ./...
 
-# Options WebSocket Streams (9 stream types, 100% coverage)
+# Options Market Data Streams (9 stream types, 100% coverage)
 cd src/binance/go/ws/options-streams
 go test -v -run TestFullIntegrationSuite ./...
 ```
@@ -133,17 +133,18 @@ go test -v -run TestFullIntegrationSuite ./...
 
 ## Test Categories
 
-### WebSocket API Tests
-Tests for request/response style WebSocket APIs:
+### WebSocket API + User Data Streams Tests
+Tests for request/response style WebSocket APIs and user-specific data streams:
 - **Public Endpoints**: Market data, exchange info, ticker prices (no auth required)
 - **Trading Endpoints**: Order placement, cancellation, modification (TRADE auth)
 - **Account Endpoints**: Balance queries, position info, trading status (USER_DATA auth)
-- **Session Management**: Authentication, connection lifecycle, user data streams
+- **Session Management**: Authentication, connection lifecycle
+- **User Data Streams**: Account updates, order updates, position changes (authenticated)
 - **Authentication Methods**: HMAC, RSA, Ed25519 signature support
 
-### WebSocket Streams Tests
-Tests for real-time data streaming WebSocket APIs:
-- **Market Data Streams**: Trade, ticker, depth, kline streams
+### Market Data Streams Tests
+Tests for real-time public market data streaming WebSocket APIs:
+- **Market Data Streams**: Trade, ticker, depth, kline streams (no auth required)
 - **Combined Streams**: Multi-stream subscriptions and event handling
 - **Connection Management**: Server selection, reconnection, error handling
 - **Subscription Management**: Dynamic subscribe/unsubscribe operations
@@ -161,8 +162,8 @@ Tests for traditional HTTP REST APIs:
 
 ### Binance Go Integration Tests
 - **Total Modules**: 10 (9 WebSocket + 1 REST)
-- **WebSocket API Modules**: 5 (spot, umfutures, cmfutures, options, pmargin)
-- **WebSocket Streams Modules**: 4 (spot-streams, umfutures-streams, cmfutures-streams, options-streams)
+- **WebSocket API + User Data Streams Modules**: 5 (spot, umfutures, cmfutures, options, pmargin)
+- **Market Data Streams Modules**: 4 (spot-streams, umfutures-streams, cmfutures-streams, options-streams)
 - **REST API Modules**: 1 (spot)
 - **Overall Coverage**: Comprehensive across all major Binance trading products
 
