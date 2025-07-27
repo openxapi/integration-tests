@@ -240,51 +240,51 @@ func (s *FullIntegrationTestSuite) testEventHandling() {
 	testClient := pmargin.NewClient()
 	
 	// Register all event handlers with correct types
-	testClient.OnConditionalOrderTradeUpdate(func(event *models.ConditionalOrderTradeUpdate) error {
+	testClient.HandleConditionalOrderTradeUpdateEvent(func(event *models.ConditionalOrderTradeUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnOpenOrderLoss(func(event *models.OpenOrderLoss) error {
+	testClient.HandleOpenOrderLossEvent(func(event *models.OpenOrderLossEvent) error {
 		return nil
 	})
 	
-	testClient.OnMarginAccountUpdate(func(event *models.MarginAccountUpdate) error {
+	testClient.HandleMarginAccountUpdateEvent(func(event *models.MarginAccountUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnLiabilityUpdate(func(event *models.LiabilityUpdate) error {
+	testClient.HandleLiabilityUpdateEvent(func(event *models.LiabilityUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+	testClient.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnFuturesOrderUpdate(func(event *models.FuturesOrderUpdate) error {
+	testClient.HandleFuturesOrderUpdateEvent(func(event *models.FuturesOrderUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnFuturesBalancePositionUpdate(func(event *models.FuturesBalancePositionUpdate) error {
+	testClient.HandleFuturesBalancePositionUpdateEvent(func(event *models.FuturesBalancePositionUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnFuturesAccountConfigUpdate(func(event *models.FuturesAccountConfigUpdate) error {
+	testClient.HandleFuturesAccountConfigUpdateEvent(func(event *models.FuturesAccountConfigUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnRiskLevelChange(func(event *models.RiskLevelChange) error {
+	testClient.HandleRiskLevelChangeEvent(func(event *models.RiskLevelChangeEvent) error {
 		return nil
 	})
 	
-	testClient.OnMarginBalanceUpdate(func(event *models.MarginBalanceUpdate) error {
+	testClient.HandleMarginBalanceUpdateEvent(func(event *models.MarginBalanceUpdateEvent) error {
 		return nil
 	})
 	
-	testClient.OnUserDataStreamExpired(func(event *models.UserDataStreamExpired) error {
+	testClient.HandleUserDataStreamExpiredEvent(func(event *models.UserDataStreamExpiredEvent) error {
 		return nil
 	})
 	
-	testClient.OnPmarginError(func(errorResp *models.ErrorResponse) error {
+	testClient.HandlePmarginError(func(errorResp *models.ErrorResponse) error {
 		return nil
 	})
 	

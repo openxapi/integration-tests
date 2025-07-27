@@ -174,6 +174,7 @@ Tests for traditional HTTP REST APIs:
 - **Real-time Data**: Live market data validation and event processing
 - **Cross-platform**: Tests run on testnet and mainnet environments
 - **Performance**: Load testing and concurrent operations
+- **Event Handlers**: Updated to use `HandleXxxEvent` naming pattern (replaced `OnXxxEvent`)
 
 ## Environment Requirements
 
@@ -189,6 +190,28 @@ Each module includes:
 - `README.md` - Module-specific documentation and usage instructions
 - `API_COVERAGE.md` - Detailed test coverage tracking
 - Comprehensive test suites with error handling and logging
+
+## Recent Updates
+
+### 🔄 **SDK Naming Pattern Changes (Latest)**
+All WebSocket integration tests have been updated to use the new SDK naming pattern:
+- **Event Handlers**: `OnXxxEvent` → `HandleXxxEvent` 
+- **Affected Modules**: All WebSocket streams modules (spot-streams, umfutures-streams, cmfutures-streams, options-streams)
+- **WebSocket API Modules**: Updated to use `HandleXxxEventEvent` pattern with proper model types
+- **Status**: ✅ All modules now compile and run successfully with updated patterns
+
+### Event Handler Examples
+```go
+// OLD pattern (no longer used)
+client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+    return nil
+})
+
+// NEW pattern (current)
+client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+    return nil
+})
+```
 
 ## Notes
 

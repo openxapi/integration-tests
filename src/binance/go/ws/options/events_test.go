@@ -27,7 +27,7 @@ func (s *EventsTestSuite) TestHandleAccountUpdate() {
 		)
 
 		// Register the event handler
-		s.client.HandleAccountUpdate(func(event *models.AccountUpdate) error {
+		s.client.HandleAccountUpdateEvent(func(event *models.AccountUpdateEvent) error {
 			mu.Lock()
 			handlerCalled = true
 			mu.Unlock()
@@ -56,7 +56,7 @@ func (s *EventsTestSuite) TestHandleOrderTradeUpdate() {
 		)
 
 		// Register the event handler
-		s.client.HandleOrderTradeUpdate(func(event *models.OrderTradeUpdate) error {
+		s.client.HandleOrderTradeUpdateEvent(func(event *models.OrderTradeUpdateEvent) error {
 			mu.Lock()
 			handlerCalled = true
 			mu.Unlock()
@@ -85,7 +85,7 @@ func (s *EventsTestSuite) TestHandleRiskLevelChange() {
 		)
 
 		// Register the event handler
-		s.client.HandleRiskLevelChange(func(event *models.RiskLevelChange) error {
+		s.client.HandleRiskLevelChangeEvent(func(event *models.RiskLevelChangeEvent) error {
 			mu.Lock()
 			handlerCalled = true
 			mu.Unlock()
@@ -116,21 +116,21 @@ func (s *EventsTestSuite) TestMultipleEventHandlers() {
 		)
 
 		// Register all event handlers
-		s.client.HandleAccountUpdate(func(event *models.AccountUpdate) error {
+		s.client.HandleAccountUpdateEvent(func(event *models.AccountUpdateEvent) error {
 			mu.Lock()
 			accountHandlerCalled = true
 			mu.Unlock()
 			return nil
 		})
 
-		s.client.HandleOrderTradeUpdate(func(event *models.OrderTradeUpdate) error {
+		s.client.HandleOrderTradeUpdateEvent(func(event *models.OrderTradeUpdateEvent) error {
 			mu.Lock()
 			orderHandlerCalled = true
 			mu.Unlock()
 			return nil
 		})
 
-		s.client.HandleRiskLevelChange(func(event *models.RiskLevelChange) error {
+		s.client.HandleRiskLevelChangeEvent(func(event *models.RiskLevelChangeEvent) error {
 			mu.Lock()
 			riskHandlerCalled = true
 			mu.Unlock()

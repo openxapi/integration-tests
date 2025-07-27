@@ -255,55 +255,55 @@ func (stc *StreamTestClient) IsConnected() bool {
 // SetupEventHandlers registers event handlers for all stream types
 func (stc *StreamTestClient) SetupEventHandlers() {
 	// Index Price events
-	stc.client.OnIndexPriceEvent(func(event *models.IndexPriceEvent) error {
+	stc.client.HandleIndexPriceEvent(func(event *models.IndexPriceEvent) error {
 		stc.recordEvent("indexPrice", event)
 		return nil
 	})
 
 	// Kline events
-	stc.client.OnKlineEvent(func(event *models.KlineEvent) error {
+	stc.client.HandleKlineEvent(func(event *models.KlineEvent) error {
 		stc.recordEvent("kline", event)
 		return nil
 	})
 
 	// Mark Price events
-	stc.client.OnMarkPriceEvent(func(event *models.MarkPriceEvent) error {
+	stc.client.HandleMarkPriceEvent(func(event *models.MarkPriceEvent) error {
 		stc.recordEvent("markPrice", event)
 		return nil
 	})
 
 	// New Symbol Info events
-	stc.client.OnNewSymbolInfoEvent(func(event *models.NewSymbolInfoEvent) error {
+	stc.client.HandleNewSymbolInfoEvent(func(event *models.NewSymbolInfoEvent) error {
 		stc.recordEvent("newSymbolInfo", event)
 		return nil
 	})
 
 	// Open Interest events
-	stc.client.OnOpenInterestEvent(func(event *models.OpenInterestEvent) error {
+	stc.client.HandleOpenInterestEvent(func(event *models.OpenInterestEvent) error {
 		stc.recordEvent("openInterest", event)
 		return nil
 	})
 
 	// Partial Depth events
-	stc.client.OnPartialDepthEvent(func(event *models.PartialDepthEvent) error {
+	stc.client.HandlePartialDepthEvent(func(event *models.PartialDepthEvent) error {
 		stc.recordEvent("partialDepth", event)
 		return nil
 	})
 
 	// Ticker events
-	stc.client.OnTickerEvent(func(event *models.TickerEvent) error {
+	stc.client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		stc.recordEvent("ticker", event)
 		return nil
 	})
 
 	// Ticker by Underlying events
-	stc.client.OnTickerByUnderlyingEvent(func(event *models.TickerByUnderlyingEvent) error {
+	stc.client.HandleTickerByUnderlyingEvent(func(event *models.TickerByUnderlyingEvent) error {
 		stc.recordEvent("tickerByUnderlying", event)
 		return nil
 	})
 
 	// Trade events
-	stc.client.OnTradeEvent(func(event *models.TradeEvent) error {
+	stc.client.HandleTradeEvent(func(event *models.TradeEvent) error {
 		stc.recordEvent("trade", event)
 		return nil
 	})

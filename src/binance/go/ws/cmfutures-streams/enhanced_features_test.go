@@ -23,7 +23,7 @@ func TestContractInfoEventHandler(t *testing.T) {
 
 	eventReceived := false
 	
-	client.OnContractInfoEvent(func(event *models.ContractInfoEvent) error {
+	client.HandleContractInfoEvent(func(event *models.ContractInfoEvent) error {
 		eventReceived = true
 		t.Logf("Received ContractInfoEvent: %+v", event)
 		
@@ -79,7 +79,7 @@ func TestAssetIndexEventHandler(t *testing.T) {
 
 	eventReceived := false
 	
-	client.OnIndexPriceEvent(func(event *models.IndexPriceEvent) error {
+	client.HandleIndexPriceEvent(func(event *models.IndexPriceEvent) error {
 		eventReceived = true
 		t.Logf("Received AssetIndexEvent: %+v", event)
 		
@@ -135,7 +135,7 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 
 	eventsReceived := 0
 	
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		eventsReceived++
 		t.Logf("✅ Received CombinedStreamEvent #%d: StreamName=%s, StreamData available=%t", 
 			eventsReceived, event.StreamName, event.StreamData != nil)
@@ -194,7 +194,7 @@ func TestSubscriptionResponseHandler(t *testing.T) {
 
 	responsesReceived := 0
 	
-	client.OnSubscriptionResponse(func(response *models.SubscriptionResponse) error {
+	client.HandleSubscriptionResponse(func(response *models.SubscriptionResponse) error {
 		responsesReceived++
 		t.Logf("Received SubscriptionResponse #%d: Id=%s, Result=%v", 
 			responsesReceived, response.Id, response.AlwaysNullForSuccessfulSubscription)
@@ -244,7 +244,7 @@ func TestStreamErrorHandler(t *testing.T) {
 
 	errorsReceived := 0
 	
-	client.OnStreamError(func(errResp *models.ErrorResponse) error {
+	client.HandleStreamError(func(errResp *models.ErrorResponse) error {
 		errorsReceived++
 		t.Logf("Received StreamError #%d: %+v", errorsReceived, errResp)
 		

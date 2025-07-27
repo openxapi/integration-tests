@@ -55,19 +55,19 @@ func (s *UserDataTestSuite) TestUserDataStreamLifecycle() {
 		log.Println("⚡ Step 3: Setting up event handlers...")
 		eventReceived := false
 		
-		client.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+		client.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 			log.Printf("📊 Received margin order update: %+v", event)
 			eventReceived = true
 			return nil
 		})
 		
-		client.OnMarginBalanceUpdate(func(event *models.MarginBalanceUpdate) error {
+		client.HandleMarginBalanceUpdateEvent(func(event *models.MarginBalanceUpdateEvent) error {
 			log.Printf("📊 Received margin balance update: %+v", event)
 			eventReceived = true
 			return nil
 		})
 		
-		client.OnUserDataStreamExpired(func(event *models.UserDataStreamExpired) error {
+		client.HandleUserDataStreamExpiredEvent(func(event *models.UserDataStreamExpiredEvent) error {
 			log.Printf("📊 User data stream expired: %+v", event)
 			return nil
 		})
@@ -173,62 +173,62 @@ func (s *UserDataTestSuite) TestUserDataStreamEvents() {
 		handlersCalled := make(map[string]bool)
 		
 		// Register handlers for all event types
-		client.OnConditionalOrderTradeUpdate(func(event *models.ConditionalOrderTradeUpdate) error {
+		client.HandleConditionalOrderTradeUpdateEvent(func(event *models.ConditionalOrderTradeUpdateEvent) error {
 			handlersCalled["conditionalOrderTradeUpdate"] = true
 			return nil
 		})
 		
-		client.OnOpenOrderLoss(func(event *models.OpenOrderLoss) error {
+		client.HandleOpenOrderLossEvent(func(event *models.OpenOrderLossEvent) error {
 			handlersCalled["openOrderLoss"] = true
 			return nil
 		})
 		
-		client.OnMarginAccountUpdate(func(event *models.MarginAccountUpdate) error {
+		client.HandleMarginAccountUpdateEvent(func(event *models.MarginAccountUpdateEvent) error {
 			handlersCalled["marginAccountUpdate"] = true
 			return nil
 		})
 		
-		client.OnLiabilityUpdate(func(event *models.LiabilityUpdate) error {
+		client.HandleLiabilityUpdateEvent(func(event *models.LiabilityUpdateEvent) error {
 			handlersCalled["liabilityUpdate"] = true
 			return nil
 		})
 		
-		client.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+		client.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 			handlersCalled["marginOrderUpdate"] = true
 			return nil
 		})
 		
-		client.OnFuturesOrderUpdate(func(event *models.FuturesOrderUpdate) error {
+		client.HandleFuturesOrderUpdateEvent(func(event *models.FuturesOrderUpdateEvent) error {
 			handlersCalled["futuresOrderUpdate"] = true
 			return nil
 		})
 		
-		client.OnFuturesBalancePositionUpdate(func(event *models.FuturesBalancePositionUpdate) error {
+		client.HandleFuturesBalancePositionUpdateEvent(func(event *models.FuturesBalancePositionUpdateEvent) error {
 			handlersCalled["futuresBalancePositionUpdate"] = true
 			return nil
 		})
 		
-		client.OnFuturesAccountConfigUpdate(func(event *models.FuturesAccountConfigUpdate) error {
+		client.HandleFuturesAccountConfigUpdateEvent(func(event *models.FuturesAccountConfigUpdateEvent) error {
 			handlersCalled["futuresAccountConfigUpdate"] = true
 			return nil
 		})
 		
-		client.OnRiskLevelChange(func(event *models.RiskLevelChange) error {
+		client.HandleRiskLevelChangeEvent(func(event *models.RiskLevelChangeEvent) error {
 			handlersCalled["riskLevelChange"] = true
 			return nil
 		})
 		
-		client.OnMarginBalanceUpdate(func(event *models.MarginBalanceUpdate) error {
+		client.HandleMarginBalanceUpdateEvent(func(event *models.MarginBalanceUpdateEvent) error {
 			handlersCalled["marginBalanceUpdate"] = true
 			return nil
 		})
 		
-		client.OnUserDataStreamExpired(func(event *models.UserDataStreamExpired) error {
+		client.HandleUserDataStreamExpiredEvent(func(event *models.UserDataStreamExpiredEvent) error {
 			handlersCalled["userDataStreamExpired"] = true
 			return nil
 		})
 		
-		client.OnPmarginError(func(errorResp *models.ErrorResponse) error {
+		client.HandlePmarginError(func(errorResp *models.ErrorResponse) error {
 			handlersCalled["error"] = true
 			return nil
 		})
@@ -247,13 +247,13 @@ func (s *UserDataTestSuite) TestUserDataStreamEvents() {
 		client := pmargin.NewClient()
 		
 		// Register handler that returns error
-		client.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+		client.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 			log.Printf("📊 Handler processing event and returning error for testing")
 			return nil // Return error to test error handling in real scenarios
 		})
 		
 		// Register error handler
-		client.OnPmarginError(func(errorResp *models.ErrorResponse) error {
+		client.HandlePmarginError(func(errorResp *models.ErrorResponse) error {
 			log.Printf("📊 Error handler called: %+v", errorResp)
 			return nil
 		})

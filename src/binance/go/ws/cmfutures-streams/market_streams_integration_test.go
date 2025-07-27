@@ -314,7 +314,7 @@ func testAggregateTradeStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.AggregateTradeEvent
 
-	client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received aggregate trade event #%d: Symbol=%s, Price=%s, Quantity=%s", 
@@ -369,7 +369,7 @@ func testMarkPriceStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.MarkPriceEvent
 
-	client.OnMarkPriceEvent(func(event *models.MarkPriceEvent) error {
+	client.HandleMarkPriceEvent(func(event *models.MarkPriceEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received mark price event #%d: Symbol=%s, MarkPrice=%s", 
@@ -422,7 +422,7 @@ func testKlineStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.KlineEvent
 
-	client.OnKlineEvent(func(event *models.KlineEvent) error {
+	client.HandleKlineEvent(func(event *models.KlineEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received kline event #%d: Symbol=%s, Interval=%s, OpenPrice=%s", 
@@ -475,7 +475,7 @@ func testContinuousKlineStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.ContinuousKlineEvent
 
-	client.OnContinuousKlineEvent(func(event *models.ContinuousKlineEvent) error {
+	client.HandleContinuousKlineEvent(func(event *models.ContinuousKlineEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received continuous kline event #%d: Pair=%s, ContractType=%s", 
@@ -523,7 +523,7 @@ func testMiniTickerStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.MiniTickerEvent
 
-	client.OnMiniTickerEvent(func(event *models.MiniTickerEvent) error {
+	client.HandleMiniTickerEvent(func(event *models.MiniTickerEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received mini ticker event #%d: Symbol=%s, ClosePrice=%s", 
@@ -576,7 +576,7 @@ func testTickerStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.TickerEvent
 
-	client.OnTickerEvent(func(event *models.TickerEvent) error {
+	client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received ticker event #%d: Symbol=%s, LastPrice=%s, Volume=%s", 
@@ -629,7 +629,7 @@ func testBookTickerStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.BookTickerEvent
 
-	client.OnBookTickerEvent(func(event *models.BookTickerEvent) error {
+	client.HandleBookTickerEvent(func(event *models.BookTickerEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received book ticker event #%d: Symbol=%s, BidPrice=%s, AskPrice=%s", 
@@ -685,7 +685,7 @@ func testLiquidationStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.LiquidationEvent
 
-	client.OnLiquidationEvent(func(event *models.LiquidationEvent) error {
+	client.HandleLiquidationEvent(func(event *models.LiquidationEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		if event.LiquidationOrder != nil {
@@ -739,7 +739,7 @@ func testPartialDepthStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	depthLevels := make(map[string]int)
 
-	client.OnDepthEvent(func(event *models.DiffDepthEvent) error {
+	client.HandleDepthEvent(func(event *models.DiffDepthEvent) error {
 		eventsReceived++
 		
 		// Count different depth levels
@@ -812,7 +812,7 @@ func testDiffDepthStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.DiffDepthEvent
 
-	client.OnDepthEvent(func(event *models.DiffDepthEvent) error {
+	client.HandleDepthEvent(func(event *models.DiffDepthEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received diff depth event #%d: Symbol=%s, FirstUpdateId=%d, FinalUpdateId=%d", 
@@ -865,7 +865,7 @@ func testDepthStreamUpdateSpeedIntegration(t *testing.T) {
 	eventsReceived := 0
 	speedCounts := make(map[string]int)
 
-	client.OnDepthEvent(func(event *models.DiffDepthEvent) error {
+	client.HandleDepthEvent(func(event *models.DiffDepthEvent) error {
 		eventsReceived++
 		// We can't easily identify the speed from the event, so just count total
 		speedCounts["total"]++
@@ -919,7 +919,7 @@ func testContractInfoStreamIntegration(t *testing.T) {
 	eventsReceived := 0
 	var lastEvent models.ContractInfoEvent
 
-	client.OnContractInfoEvent(func(event *models.ContractInfoEvent) error {
+	client.HandleContractInfoEvent(func(event *models.ContractInfoEvent) error {
 		eventsReceived++
 		lastEvent = *event
 		t.Logf("Received contract info event #%d: EventType=%s", eventsReceived, event.EventType)
@@ -970,19 +970,19 @@ func testAllArrayStreamsIntegration(t *testing.T) {
 	totalEventsReceived := 0
 
 	// Set up handlers for all array streams
-	client.OnTickerEvent(func(event *models.TickerEvent) error {
+	client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		totalEventsReceived++
 		t.Logf("Array ticker event: Symbol=%s", event.Symbol)
 		return nil
 	})
 
-	client.OnMiniTickerEvent(func(event *models.MiniTickerEvent) error {
+	client.HandleMiniTickerEvent(func(event *models.MiniTickerEvent) error {
 		totalEventsReceived++
 		t.Logf("Array mini ticker event: Symbol=%s", event.Symbol)
 		return nil
 	})
 
-	client.OnBookTickerEvent(func(event *models.BookTickerEvent) error {
+	client.HandleBookTickerEvent(func(event *models.BookTickerEvent) error {
 		totalEventsReceived++
 		t.Logf("Array book ticker event: Symbol=%s", event.Symbol)
 		return nil

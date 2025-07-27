@@ -46,7 +46,7 @@ func TestConcurrentStreams(t *testing.T) {
 			defer client.Disconnect()
 
 			clientEvents := 0
-			client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+			client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 				clientEvents++
 				mu.Lock()
 				totalEvents++
@@ -114,28 +114,28 @@ func TestHighVolumeStreams(t *testing.T) {
 	startTime := time.Now()
 
 	// Setup handlers
-	client.client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		eventMu.Lock()
 		eventCounts["aggTrade"]++
 		eventMu.Unlock()
 		return nil
 	})
 
-	client.client.OnBookTickerEvent(func(event *models.BookTickerEvent) error {
+	client.client.HandleBookTickerEvent(func(event *models.BookTickerEvent) error {
 		eventMu.Lock()
 		eventCounts["bookTicker"]++
 		eventMu.Unlock()
 		return nil
 	})
 
-	client.client.OnDepthEvent(func(event *models.DiffDepthEvent) error {
+	client.client.HandleDepthEvent(func(event *models.DiffDepthEvent) error {
 		eventMu.Lock()
 		eventCounts["depth"]++
 		eventMu.Unlock()
 		return nil
 	})
 
-	client.client.OnTickerEvent(func(event *models.TickerEvent) error {
+	client.client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		eventMu.Lock()
 		eventCounts["ticker"]++
 		eventMu.Unlock()
@@ -198,7 +198,7 @@ func BenchmarkEventProcessing(b *testing.B) {
 	defer client.Disconnect()
 
 	eventCount := 0
-	client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		eventCount++
 		return nil
 	})
@@ -297,7 +297,7 @@ func TestStreamLatency(t *testing.T) {
 	var latencies []time.Duration
 	var latencyMu sync.Mutex
 
-	client.client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		// Calculate approximate latency using event time
 		if event.EventTime > 0 {
 			eventTime := time.Unix(0, event.EventTime*int64(time.Millisecond))

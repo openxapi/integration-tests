@@ -325,67 +325,67 @@ func (stc *StreamTestClient) SetupEventHandlersForCombinedStreams() {
 // setupEventHandlers is the internal method that sets up event handlers
 func (stc *StreamTestClient) setupEventHandlers(includeCombinedHandler bool) {
 	// Aggregate trade events
-	stc.client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	stc.client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		stc.recordEvent("aggTrade", event)
 		return nil
 	})
 
 	// Mark price events (futures-specific)
-	stc.client.OnMarkPriceEvent(func(event *models.MarkPriceEvent) error {
+	stc.client.HandleMarkPriceEvent(func(event *models.MarkPriceEvent) error {
 		stc.recordEvent("markPrice", event)
 		return nil
 	})
 
 	// Kline events
-	stc.client.OnKlineEvent(func(event *models.KlineEvent) error {
+	stc.client.HandleKlineEvent(func(event *models.KlineEvent) error {
 		stc.recordEvent("kline", event)
 		return nil
 	})
 
 	// Continuous kline events (futures-specific)
-	stc.client.OnContinuousKlineEvent(func(event *models.ContinuousKlineEvent) error {
+	stc.client.HandleContinuousKlineEvent(func(event *models.ContinuousKlineEvent) error {
 		stc.recordEvent("continuousKline", event)
 		return nil
 	})
 
 	// Mini ticker events
-	stc.client.OnMiniTickerEvent(func(event *models.MiniTickerEvent) error {
+	stc.client.HandleMiniTickerEvent(func(event *models.MiniTickerEvent) error {
 		stc.recordEvent("miniTicker", event)
 		return nil
 	})
 
 	// Ticker events
-	stc.client.OnTickerEvent(func(event *models.TickerEvent) error {
+	stc.client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		stc.recordEvent("ticker", event)
 		return nil
 	})
 
 	// Book ticker events
-	stc.client.OnBookTickerEvent(func(event *models.BookTickerEvent) error {
+	stc.client.HandleBookTickerEvent(func(event *models.BookTickerEvent) error {
 		stc.recordEvent("bookTicker", event)
 		return nil
 	})
 
 	// Liquidation events (futures-specific)
-	stc.client.OnLiquidationEvent(func(event *models.LiquidationEvent) error {
+	stc.client.HandleLiquidationEvent(func(event *models.LiquidationEvent) error {
 		stc.recordEvent("forceOrder", event)
 		return nil
 	})
 
 	// Diff depth events
-	stc.client.OnDepthEvent(func(event *models.DiffDepthEvent) error {
+	stc.client.HandleDepthEvent(func(event *models.DiffDepthEvent) error {
 		stc.recordEvent("depthUpdate", event)
 		return nil
 	})
 
 	// Contract info events (futures-specific)
-	stc.client.OnContractInfoEvent(func(event *models.ContractInfoEvent) error {
+	stc.client.HandleContractInfoEvent(func(event *models.ContractInfoEvent) error {
 		stc.recordEvent("contractInfo", event)
 		return nil
 	})
 
 	// Index price events (using available event type)
-	stc.client.OnIndexPriceEvent(func(event *models.IndexPriceEvent) error {
+	stc.client.HandleIndexPriceEvent(func(event *models.IndexPriceEvent) error {
 		stc.recordEvent("indexPriceUpdate", event)
 		return nil
 	})
@@ -394,20 +394,20 @@ func (stc *StreamTestClient) setupEventHandlers(includeCombinedHandler bool) {
 	// These events are processed through other event types or combined streams
 
 	// Subscription response events
-	stc.client.OnSubscriptionResponse(func(event *models.SubscriptionResponse) error {
+	stc.client.HandleSubscriptionResponse(func(event *models.SubscriptionResponse) error {
 		stc.recordEvent("subscriptionResponse", event)
 		return nil
 	})
 
 	// Error events
-	stc.client.OnStreamError(func(event *models.ErrorResponse) error {
+	stc.client.HandleStreamError(func(event *models.ErrorResponse) error {
 		stc.recordEvent("error", event)
 		return nil
 	})
 
 	// Combined stream events (only register if requested)
 	if includeCombinedHandler {
-		stc.client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+		stc.client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 			stc.recordEvent("combinedStream", event)
 			return nil
 		})

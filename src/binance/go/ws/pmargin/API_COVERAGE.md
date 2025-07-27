@@ -49,18 +49,18 @@ The Binance Portfolio Margin WebSocket API provides real-time access to portfoli
 
 Based on the SDK analysis, the Portfolio Margin WebSocket client supports the following event handlers:
 
-1. **ConditionalOrderTradeUpdateHandler** - `OnConditionalOrderTradeUpdate()`
-2. **OpenOrderLossHandler** - `OnOpenOrderLoss()`
-3. **MarginAccountUpdateHandler** - `OnMarginAccountUpdate()`
-4. **LiabilityUpdateHandler** - `OnLiabilityUpdate()`
-5. **MarginOrderUpdateHandler** - `OnMarginOrderUpdate()`
-6. **FuturesOrderUpdateHandler** - `OnFuturesOrderUpdate()`
-7. **FuturesBalancePositionUpdateHandler** - `OnFuturesBalancePositionUpdate()`
-8. **FuturesAccountConfigUpdateHandler** - `OnFuturesAccountConfigUpdate()`
-9. **RiskLevelChangeHandler** - `OnRiskLevelChange()`
-10. **MarginBalanceUpdateHandler** - `OnMarginBalanceUpdate()`
-11. **UserDataStreamExpiredHandler** - `OnUserDataStreamExpired()`
-12. **PmarginErrorHandler** - `OnPmarginError()`
+1. **ConditionalOrderTradeUpdateHandler** - `HandleConditionalOrderTradeUpdateEvent()`
+2. **OpenOrderLossHandler** - `HandleOpenOrderLossEvent()`
+3. **MarginAccountUpdateHandler** - `HandleMarginAccountUpdateEvent()`
+4. **LiabilityUpdateHandler** - `HandleLiabilityUpdateEvent()`
+5. **MarginOrderUpdateHandler** - `HandleMarginOrderUpdateEvent()`
+6. **FuturesOrderUpdateHandler** - `HandleFuturesOrderUpdateEvent()`
+7. **FuturesBalancePositionUpdateHandler** - `HandleFuturesBalancePositionUpdateEvent()`
+8. **FuturesAccountConfigUpdateHandler** - `HandleFuturesAccountConfigUpdateEvent()`
+9. **RiskLevelChangeHandler** - `HandleRiskLevelChangeEvent()`
+10. **MarginBalanceUpdateHandler** - `HandleMarginBalanceUpdateEvent()`
+11. **UserDataStreamExpiredHandler** - `HandleUserDataStreamExpiredEvent()`
+12. **PmarginErrorHandler** - `HandlePmarginError()`
 
 ### Connection Methods Available
 

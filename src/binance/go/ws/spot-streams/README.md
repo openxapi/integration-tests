@@ -1,25 +1,19 @@
-# Binance USD-M Futures WebSocket Streams Integration Tests
+# Binance Spot WebSocket Streams Integration Tests
 
-This directory contains comprehensive integration tests for the Binance USD-M Futures WebSocket Streams SDK.
+This directory contains comprehensive integration tests for the Binance Spot WebSocket Streams SDK.
 
 ## Overview
 
-- **SDK Location**: `../binance-go/ws/umfutures-streams`  
+- **SDK Location**: `../binance-go/ws/spot-streams`  
 - **Test Suite**: Comprehensive integration tests covering all stream types and functionality
-- **Server**: Uses Binance Testnet by default (`wss://fstream.binancefuture.com/ws`)
+- **Server**: Uses Binance Testnet by default (`wss://testnet.binance.vision/ws`)
 - **Coverage**: 100% of available stream types and connection methods
 
 ## Stream Types Tested
 
-### Futures-Specific Streams
+### Individual Symbol Streams
+- **Trade Streams**: `symbol@trade`
 - **Aggregate Trade Streams**: `symbol@aggTrade`
-- **Mark Price Streams**: `symbol@markPrice@1s`
-- **Continuous Kline Streams**: `pair_contractType@continuousKline_interval`
-- **Liquidation Order Streams**: `symbol@forceOrder`
-- **Composite Index Streams**: `symbol@compositeIndex`
-- **Asset Index Streams**: `symbol@assetIndex`
-
-### Standard Market Data Streams
 - **Kline Streams**: `symbol@kline_interval`
 - **24hr Mini Ticker**: `symbol@miniTicker`
 - **24hr Ticker**: `symbol@ticker`
@@ -49,7 +43,7 @@ This directory contains comprehensive integration tests for the Binance USD-M Fu
 
 ```bash
 # Navigate to test directory
-cd src/binance/go/ws/umfutures-streams
+cd src/binance/go/ws/spot-streams
 
 # Run all tests
 go test -v
@@ -66,16 +60,14 @@ go test -v -run TestConnection
 go test -v -run TestServerManagement
 
 # Stream functionality
+go test -v -run TestTradeStream
 go test -v -run TestAggregateTradeStream
-go test -v -run TestMarkPriceStream
 go test -v -run TestKlineStream
-go test -v -run TestContinuousKlineStream
-go test -v -run TestLiquidationOrderStream
+go test -v -run TestTickerStream
 
 # Depth streams
 go test -v -run TestPartialDepthStream
 go test -v -run TestDiffDepthStream
-go test -v -run TestDifferentDepthLevels
 
 # Combined streams
 go test -v -run TestCombinedStream
@@ -122,7 +114,7 @@ Tests use these symbols by default:
 - `btcusdt` - High volume, reliable for testing
 - `ethusdt` - High volume, good for multi-stream tests  
 - `adausdt` - Moderate volume
-- `btcusd` - For continuous contract testing
+- `bnbusdt` - Exchange token pair
 
 ## Features Tested
 
@@ -139,7 +131,7 @@ Tests use these symbols by default:
 - Rapid subscription changes
 
 ### ✅ Event Processing
-- All futures-specific event types
+- All spot market data event types
 - Event filtering and counting
 - Concurrent event handling
 - Memory management
@@ -174,15 +166,15 @@ Tests use these symbols by default:
 ### ✅ **All Issues Resolved:**
 1. **JSON Field Type Mismatch**: No longer seeing "cannot unmarshal number into Go struct field" errors
 2. **Event Handler Mapping**: All event types now properly processed by their handlers
-3. **Individual Streams**: aggTrade, markPrice, kline, and all other stream types working
+3. **Individual Streams**: Trade, aggTrade, kline, and all other stream types working
 4. **Combined Streams**: Continue to work perfectly with full event processing
-5. **Event Type Corrections**: Fixed partial depth (depthUpdate) and asset index (assetIndexUpdate) event types
+5. **Event Type Corrections**: Fixed partial depth (depthUpdate) and ticker event types
 6. **Combined Streams Fix**: Added proper combined streams connection for combined stream events
 
 ### Test Status:
 - ✅ **Subscription Operations**: All subscribe/unsubscribe operations work correctly
 - ✅ **Connection Management**: WebSocket connections and server management functional  
-- ✅ **Combined Streams**: Full event processing working (aggTrade, depth, bookTicker, etc.)
+- ✅ **Combined Streams**: Full event processing working (trade, depth, bookTicker, etc.)
 - ✅ **Individual Streams**: Full event processing working for all stream types
 - ✅ **Event Processing**: All handlers correctly receiving and processing events
 
@@ -194,8 +186,8 @@ Tests use these symbols by default:
 ## Test Results
 
 The integration test suite provides comprehensive coverage of:
-- **12** different stream types
-- **45+** test functions
+- **10** different stream types
+- **35+** test functions
 - **3** benchmark functions
 - **100%** coverage of available SDK functionality
 
@@ -227,7 +219,7 @@ func TestExampleStream(t *testing.T) {
 client.SetupEventHandlers()
 
 // Custom handlers for specific testing needs - Updated naming pattern
-client.client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+client.client.HandleTradeEvent(func(event *models.TradeEvent) error {
     // Test-specific event processing
     return nil
 })
@@ -244,14 +236,15 @@ client.client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) 
 - No real trading or financial risk
 - Rate limiting respected to avoid API restrictions
 - Comprehensive error handling prevents test suite failures
-- All stream types specific to USD-M futures are covered
+- All stream types specific to spot trading are covered
 
-## Next Steps
+## API Coverage
 
-1. **SDK Fix**: The referenced but missing model types should be added or references removed
-2. **Enhanced Testing**: Additional edge cases and stress testing scenarios
-3. **Monitoring**: Real-time performance monitoring during extended runs
-4. **Documentation**: Usage examples for each stream type
+See `API_COVERAGE.md` for detailed information about:
+- Tested vs untested stream types
+- Coverage statistics
+- Known limitations
+- Future test expansion plans
 
 ## Support
 

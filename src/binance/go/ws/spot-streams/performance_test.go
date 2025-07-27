@@ -142,7 +142,7 @@ func TestStreamLatency(t *testing.T) {
 	var mu sync.Mutex
 
 	// Override event handler to measure latency
-	client.client.OnTradeEvent(func(event *models.TradeEvent) error {
+	client.client.HandleTradeEvent(func(event *models.TradeEvent) error {
 		mu.Lock()
 		defer mu.Unlock()
 		

@@ -24,7 +24,7 @@ func TestCombinedStreamEventHandler(t *testing.T) {
 
 	eventsReceived := 0
 	
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		eventsReceived++
 		t.Logf("✅ Received CombinedStreamEvent #%d: StreamName=%s, StreamData available=%t", 
 			eventsReceived, event.StreamName, event.StreamData != nil)
