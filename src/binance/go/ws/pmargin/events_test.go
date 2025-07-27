@@ -106,73 +106,73 @@ func (s *EventsTestSuite) TestEventHandlerRegistration() {
 		state := &EventHandlerTestState{}
 		
 		// Register all event handlers
-		client.OnConditionalOrderTradeUpdate(func(event *models.ConditionalOrderTradeUpdate) error {
+		client.HandleConditionalOrderTradeUpdateEvent(func(event *models.ConditionalOrderTradeUpdateEvent) error {
 			log.Printf("📊 Received conditional order trade update: %+v", event)
 			state.RecordEvent("conditionalOrderTradeUpdate")
 			return nil
 		})
 		
-		client.OnOpenOrderLoss(func(event *models.OpenOrderLoss) error {
+		client.HandleOpenOrderLossEvent(func(event *models.OpenOrderLossEvent) error {
 			log.Printf("📊 Received open order loss: %+v", event)
 			state.RecordEvent("openOrderLoss")
 			return nil
 		})
 		
-		client.OnMarginAccountUpdate(func(event *models.MarginAccountUpdate) error {
+		client.HandleMarginAccountUpdateEvent(func(event *models.MarginAccountUpdateEvent) error {
 			log.Printf("📊 Received margin account update: %+v", event)
 			state.RecordEvent("marginAccountUpdate")
 			return nil
 		})
 		
-		client.OnLiabilityUpdate(func(event *models.LiabilityUpdate) error {
+		client.HandleLiabilityUpdateEvent(func(event *models.LiabilityUpdateEvent) error {
 			log.Printf("📊 Received liability update: %+v", event)
 			state.RecordEvent("liabilityUpdate")
 			return nil
 		})
 		
-		client.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+		client.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 			log.Printf("📊 Received margin order update: %+v", event)
 			state.RecordEvent("marginOrderUpdate")
 			return nil
 		})
 		
-		client.OnFuturesOrderUpdate(func(event *models.FuturesOrderUpdate) error {
+		client.HandleFuturesOrderUpdateEvent(func(event *models.FuturesOrderUpdateEvent) error {
 			log.Printf("📊 Received futures order update: %+v", event)
 			state.RecordEvent("futuresOrderUpdate")
 			return nil
 		})
 		
-		client.OnFuturesBalancePositionUpdate(func(event *models.FuturesBalancePositionUpdate) error {
+		client.HandleFuturesBalancePositionUpdateEvent(func(event *models.FuturesBalancePositionUpdateEvent) error {
 			log.Printf("📊 Received futures balance position update: %+v", event)
 			state.RecordEvent("futuresBalancePositionUpdate")
 			return nil
 		})
 		
-		client.OnFuturesAccountConfigUpdate(func(event *models.FuturesAccountConfigUpdate) error {
+		client.HandleFuturesAccountConfigUpdateEvent(func(event *models.FuturesAccountConfigUpdateEvent) error {
 			log.Printf("📊 Received futures account config update: %+v", event)
 			state.RecordEvent("futuresAccountConfigUpdate")
 			return nil
 		})
 		
-		client.OnRiskLevelChange(func(event *models.RiskLevelChange) error {
+		client.HandleRiskLevelChangeEvent(func(event *models.RiskLevelChangeEvent) error {
 			log.Printf("📊 Received risk level change: %+v", event)
 			state.RecordEvent("riskLevelChange")
 			return nil
 		})
 		
-		client.OnMarginBalanceUpdate(func(event *models.MarginBalanceUpdate) error {
+		client.HandleMarginBalanceUpdateEvent(func(event *models.MarginBalanceUpdateEvent) error {
 			log.Printf("📊 Received margin balance update: %+v", event)
 			state.RecordEvent("marginBalanceUpdate")
 			return nil
 		})
 		
-		client.OnUserDataStreamExpired(func(event *models.UserDataStreamExpired) error {
+		client.HandleUserDataStreamExpiredEvent(func(event *models.UserDataStreamExpiredEvent) error {
 			log.Printf("📊 Received user data stream expired: %+v", event)
 			state.RecordEvent("userDataStreamExpired")
 			return nil
 		})
 		
-		client.OnPmarginError(func(error *models.ErrorResponse) error {
+		client.HandlePmarginError(func(error *models.ErrorResponse) error {
 			log.Printf("📊 Received error: %+v", error)
 			state.RecordEvent("error")
 			state.lastError = nil // Store for testing
@@ -188,7 +188,7 @@ func (s *EventsTestSuite) TestEventHandlerRegistration() {
 		client := pmargin.NewClient()
 		
 		// Register a handler that returns an error
-		client.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+		client.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 			return nil // Return error to test error handling
 		})
 		
@@ -203,7 +203,7 @@ func (s *EventsTestSuite) TestEventHandlerRegistration() {
 		var wg sync.WaitGroup
 		
 		// Register handlers that simulate concurrent processing
-		client.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+		client.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -213,7 +213,7 @@ func (s *EventsTestSuite) TestEventHandlerRegistration() {
 			return nil
 		})
 		
-		client.OnMarginBalanceUpdate(func(event *models.MarginBalanceUpdate) error {
+		client.HandleMarginBalanceUpdateEvent(func(event *models.MarginBalanceUpdateEvent) error {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -411,73 +411,73 @@ func (s *EventsTestSuite) TestRealTimeEventHandling() {
 
 // Helper function to register all event handlers
 func (s *EventsTestSuite) registerAllEventHandlers(client *pmargin.Client, state *EventHandlerTestState) {
-	client.OnConditionalOrderTradeUpdate(func(event *models.ConditionalOrderTradeUpdate) error {
+	client.HandleConditionalOrderTradeUpdateEvent(func(event *models.ConditionalOrderTradeUpdateEvent) error {
 		log.Printf("📊 Conditional Order Trade Update: %+v", event)
 		state.RecordEvent("conditionalOrderTradeUpdate")
 		return nil
 	})
 	
-	client.OnOpenOrderLoss(func(event *models.OpenOrderLoss) error {
+	client.HandleOpenOrderLossEvent(func(event *models.OpenOrderLossEvent) error {
 		log.Printf("📊 Open Order Loss: %+v", event)
 		state.RecordEvent("openOrderLoss")
 		return nil
 	})
 	
-	client.OnMarginAccountUpdate(func(event *models.MarginAccountUpdate) error {
+	client.HandleMarginAccountUpdateEvent(func(event *models.MarginAccountUpdateEvent) error {
 		log.Printf("📊 Margin Account Update: %+v", event)
 		state.RecordEvent("marginAccountUpdate")
 		return nil
 	})
 	
-	client.OnLiabilityUpdate(func(event *models.LiabilityUpdate) error {
+	client.HandleLiabilityUpdateEvent(func(event *models.LiabilityUpdateEvent) error {
 		log.Printf("📊 Liability Update: %+v", event)
 		state.RecordEvent("liabilityUpdate")
 		return nil
 	})
 	
-	client.OnMarginOrderUpdate(func(event *models.MarginOrderUpdate) error {
+	client.HandleMarginOrderUpdateEvent(func(event *models.MarginOrderUpdateEvent) error {
 		log.Printf("📊 Margin Order Update: %+v", event)
 		state.RecordEvent("marginOrderUpdate")
 		return nil
 	})
 	
-	client.OnFuturesOrderUpdate(func(event *models.FuturesOrderUpdate) error {
+	client.HandleFuturesOrderUpdateEvent(func(event *models.FuturesOrderUpdateEvent) error {
 		log.Printf("📊 Futures Order Update: %+v", event)
 		state.RecordEvent("futuresOrderUpdate")
 		return nil
 	})
 	
-	client.OnFuturesBalancePositionUpdate(func(event *models.FuturesBalancePositionUpdate) error {
+	client.HandleFuturesBalancePositionUpdateEvent(func(event *models.FuturesBalancePositionUpdateEvent) error {
 		log.Printf("📊 Futures Balance Position Update: %+v", event)
 		state.RecordEvent("futuresBalancePositionUpdate")
 		return nil
 	})
 	
-	client.OnFuturesAccountConfigUpdate(func(event *models.FuturesAccountConfigUpdate) error {
+	client.HandleFuturesAccountConfigUpdateEvent(func(event *models.FuturesAccountConfigUpdateEvent) error {
 		log.Printf("📊 Futures Account Config Update: %+v", event)
 		state.RecordEvent("futuresAccountConfigUpdate")
 		return nil
 	})
 	
-	client.OnRiskLevelChange(func(event *models.RiskLevelChange) error {
+	client.HandleRiskLevelChangeEvent(func(event *models.RiskLevelChangeEvent) error {
 		log.Printf("📊 Risk Level Change: %+v", event)
 		state.RecordEvent("riskLevelChange")
 		return nil
 	})
 	
-	client.OnMarginBalanceUpdate(func(event *models.MarginBalanceUpdate) error {
+	client.HandleMarginBalanceUpdateEvent(func(event *models.MarginBalanceUpdateEvent) error {
 		log.Printf("📊 Margin Balance Update: %+v", event)
 		state.RecordEvent("marginBalanceUpdate")
 		return nil
 	})
 	
-	client.OnUserDataStreamExpired(func(event *models.UserDataStreamExpired) error {
+	client.HandleUserDataStreamExpiredEvent(func(event *models.UserDataStreamExpiredEvent) error {
 		log.Printf("📊 User Data Stream Expired: %+v", event)
 		state.RecordEvent("userDataStreamExpired")
 		return nil
 	})
 	
-	client.OnPmarginError(func(errorResp *models.ErrorResponse) error {
+	client.HandlePmarginError(func(errorResp *models.ErrorResponse) error {
 		log.Printf("📊 Portfolio Margin Error: %+v", errorResp)
 		state.RecordEvent("error")
 		return nil

@@ -162,7 +162,12 @@ Tests use these symbols by default:
 
 ## SDK Status
 
-✅ **SDK Fully Fixed**: All JSON parsing and event handler issues have been resolved!
+✅ **SDK Fully Updated**: All JSON parsing, event handler issues, and naming patterns have been resolved!
+
+### 🔄 **Recent SDK Updates:**
+- **Event Handler Naming**: Updated from `OnXxxEvent` to `HandleXxxEvent` pattern
+- **Integration Tests**: All tests updated to use new `HandleXxxEvent` method names
+- **Backward Compatibility**: Old `OnXxxEvent` methods have been replaced
 
 ### ✅ **All Issues Resolved:**
 1. **JSON Field Type Mismatch**: No longer seeing "cannot unmarshal number into Go struct field" errors
@@ -220,7 +225,7 @@ func TestExampleStream(t *testing.T) {
 client.SetupEventHandlers()
 
 // Custom handlers for specific testing needs
-client.client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+client.client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
     // Test-specific event processing
     return nil
 })

@@ -178,6 +178,29 @@ Enable verbose logging to see detailed event information:
 go test -v -run TestFullIntegrationSuite 2>&1 | tee test.log
 ```
 
+## SDK Status
+
+✅ **SDK Fully Updated**: All event handler naming patterns have been updated!
+
+### 🔄 **Recent SDK Updates:**
+- **Event Handler Naming**: Updated from `OnXxxEvent` to `HandleXxxEvent` pattern
+- **Integration Tests**: All tests updated to use new `HandleXxxEvent` method names
+- **Backward Compatibility**: Old `OnXxxEvent` methods have been replaced
+
+### Event Handler Pattern
+```go
+// Updated naming pattern for all event handlers
+client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+    // Process combined stream events
+    return nil
+})
+
+client.HandleTradeEvent(func(event *models.TradeEvent) error {
+    // Process trade events
+    return nil
+})
+```
+
 ## Development Notes
 
 ### Adding New Tests

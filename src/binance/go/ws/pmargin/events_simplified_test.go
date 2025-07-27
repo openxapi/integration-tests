@@ -29,17 +29,17 @@ func (s *EventsSimplifiedTestSuite) TestEventModelStructures() {
 		
 		// Test that we can create instances of all event models
 		models := []interface{}{
-			&models.ConditionalOrderTradeUpdate{},
-			&models.OpenOrderLoss{},
-			&models.MarginAccountUpdate{},
-			&models.LiabilityUpdate{},
-			&models.MarginOrderUpdate{},
-			&models.FuturesOrderUpdate{},
-			&models.FuturesBalancePositionUpdate{},
-			&models.FuturesAccountConfigUpdate{},
-			&models.RiskLevelChange{},
-			&models.MarginBalanceUpdate{},
-			&models.UserDataStreamExpired{},
+			&models.ConditionalOrderTradeUpdateEvent{},
+			&models.OpenOrderLossEvent{},
+			&models.MarginAccountUpdateEvent{},
+			&models.LiabilityUpdateEvent{},
+			&models.MarginOrderUpdateEvent{},
+			&models.FuturesOrderUpdateEvent{},
+			&models.FuturesBalancePositionUpdateEvent{},
+			&models.FuturesAccountConfigUpdateEvent{},
+			&models.RiskLevelChangeEvent{},
+			&models.MarginBalanceUpdateEvent{},
+			&models.UserDataStreamExpiredEvent{},
 			&models.ErrorResponse{},
 		}
 		
@@ -54,7 +54,7 @@ func (s *EventsSimplifiedTestSuite) TestEventModelStructures() {
 		log.Println("📍 Testing event model JSON serialization...")
 		
 		// Test MarginOrderUpdate as an example
-		orderUpdate := &models.MarginOrderUpdate{
+		orderUpdate := &models.MarginOrderUpdateEvent{
 			EventType:   "executionReport",
 			EventTime:   1234567890,
 			Symbol:      "BTCUSDT",
@@ -68,7 +68,7 @@ func (s *EventsSimplifiedTestSuite) TestEventModelStructures() {
 		s.Require().Contains(string(jsonData), "BTCUSDT")
 		
 		// Test deserialization
-		var deserializedUpdate models.MarginOrderUpdate
+		var deserializedUpdate models.MarginOrderUpdateEvent
 		err = json.Unmarshal(jsonData, &deserializedUpdate)
 		s.Require().NoError(err)
 		s.Require().Equal("executionReport", deserializedUpdate.EventType)
@@ -132,8 +132,8 @@ func (s *EventsSimplifiedTestSuite) TestEventHandlerWorkarounds() {
 		// but the actual model types are "ConditionalOrderTradeUpdate" (without "Event" suffix)
 		
 		log.Println("⚠️  SDK Issue: Handler types reference non-existent Event types")
-		log.Println("⚠️  Example: ConditionalOrderTradeUpdateHandler expects *models.ConditionalOrderTradeUpdateEvent")
-		log.Println("⚠️  But actual type is: *models.ConditionalOrderTradeUpdate")
+		log.Println("⚠️  Example: ConditionalOrderTradeUpdateHandler expects *models.ConditionalOrderTradeUpdateEventEvent")
+		log.Println("⚠️  But actual type is: *models.ConditionalOrderTradeUpdateEvent")
 		
 		// We can verify the client exists and basic structure is there
 		s.Require().NotNil(client)
@@ -166,7 +166,7 @@ func (s *EventsSimplifiedTestSuite) TestMockEventProcessing() {
 			"T": 1234567890
 		}`
 		
-		var orderUpdate models.MarginOrderUpdate
+		var orderUpdate models.MarginOrderUpdateEvent
 		err := json.Unmarshal([]byte(mockJSON), &orderUpdate)
 		s.Require().NoError(err)
 		
@@ -186,7 +186,7 @@ func (s *EventsSimplifiedTestSuite) TestMockEventProcessing() {
 			"E": 1234567890
 		}`
 		
-		var expiredEvent models.UserDataStreamExpired
+		var expiredEvent models.UserDataStreamExpiredEvent
 		err := json.Unmarshal([]byte(mockJSON), &expiredEvent)
 		s.Require().NoError(err)
 		
@@ -225,7 +225,7 @@ func (s *EventsSimplifiedTestSuite) TestEventTypeHelpers() {
 	s.Run("MarginOrderUpdateHelpers", func() {
 		log.Println("📍 Testing MarginOrderUpdate helper methods...")
 		
-		orderUpdate := &models.MarginOrderUpdate{
+		orderUpdate := &models.MarginOrderUpdateEvent{
 			EventType: "executionReport",
 			EventTime: 1234567890,
 			Symbol:    "BTCUSDT",
@@ -250,7 +250,7 @@ func (s *EventsSimplifiedTestSuite) TestEventTypeHelpers() {
 	s.Run("UserDataStreamExpiredHelpers", func() {
 		log.Println("📍 Testing UserDataStreamExpired helper methods...")
 		
-		expiredEvent := &models.UserDataStreamExpired{
+		expiredEvent := &models.UserDataStreamExpiredEvent{
 			EventType: "listenKeyExpired",
 			EventTime: 1234567890,
 		}

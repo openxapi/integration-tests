@@ -34,7 +34,7 @@ func TestCombinedStreamEventReception(t *testing.T) {
 	var individualEvents []interface{}
 
 	// Set up combined stream event handler
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		combinedEvents = append(combinedEvents, event)
 		t.Logf("✅ Received CombinedStreamEvent - Stream: %s, Data type: %T", 
 			event.StreamName, event.StreamData)
@@ -42,13 +42,13 @@ func TestCombinedStreamEventReception(t *testing.T) {
 	})
 
 	// Set up individual event handlers to verify they still work
-	client.OnTradeEvent(func(event *models.TradeEvent) error {
+	client.HandleTradeEvent(func(event *models.TradeEvent) error {
 		individualEvents = append(individualEvents, event)
 		t.Logf("📈 Received individual TradeEvent: %s", event.Symbol)
 		return nil
 	})
 
-	client.OnTickerEvent(func(event *models.TickerEvent) error {
+	client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		individualEvents = append(individualEvents, event)
 		t.Logf("📊 Received individual TickerEvent: %s", event.Symbol)
 		return nil
@@ -151,7 +151,7 @@ func TestCombinedStreamEventDataTypes(t *testing.T) {
 	eventsByType := make(map[string][]*models.CombinedStreamEvent)
 
 	// Set up combined stream event handler
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		// Determine event type from stream name
 		eventType := "unknown"
 		if contains(event.StreamName, "@trade") {
@@ -258,7 +258,7 @@ func TestCombinedStreamMicrosecondPrecision(t *testing.T) {
 	var combinedEvents []*models.CombinedStreamEvent
 
 	// Set up combined stream event handler
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		combinedEvents = append(combinedEvents, event)
 		t.Logf("⏱️  Received microsecond precision event: %s", event.StreamName)
 		return nil
@@ -369,7 +369,7 @@ func TestCombinedStreamSubscriptionManagement(t *testing.T) {
 	var allEvents []*models.CombinedStreamEvent
 
 	// Set up combined stream event handler
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		allEvents = append(allEvents, event)
 		return nil
 	})
@@ -526,7 +526,7 @@ func testSingleStream(t *testing.T, streamName string) []interface{} {
 
 	var events []interface{}
 
-	client.OnTradeEvent(func(event *models.TradeEvent) error {
+	client.HandleTradeEvent(func(event *models.TradeEvent) error {
 		events = append(events, event)
 		return nil
 	})
@@ -565,7 +565,7 @@ func testCombinedStream(t *testing.T, streamName string) []*models.CombinedStrea
 
 	var events []*models.CombinedStreamEvent
 
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		events = append(events, event)
 		return nil
 	})

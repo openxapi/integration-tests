@@ -37,14 +37,14 @@ func TestCombinedStreamEventReception(t *testing.T) {
 	var regularEvents []interface{}
 	eventsMu := make(chan struct{}, 100)
 
-	client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		combinedEvents = append(combinedEvents, event)
 		eventsMu <- struct{}{}
 		t.Logf("Received combined stream event from: %s", event.StreamName)
 		return nil
 	})
 
-	client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		regularEvents = append(regularEvents, event)
 		eventsMu <- struct{}{}
 		t.Logf("Received aggregate trade event: %s", event.Symbol)
@@ -124,37 +124,37 @@ func TestCombinedStreamEventDataTypes(t *testing.T) {
 	eventsMu := make(chan string, 100)
 
 	// Setup handlers for different event types
-	client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		eventCounts["aggTrade"]++
 		eventsMu <- "aggTrade"
 		return nil
 	})
 
-	client.OnTickerEvent(func(event *models.TickerEvent) error {
+	client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		eventCounts["ticker"]++
 		eventsMu <- "ticker"
 		return nil
 	})
 
-	client.OnMiniTickerEvent(func(event *models.MiniTickerEvent) error {
+	client.HandleMiniTickerEvent(func(event *models.MiniTickerEvent) error {
 		eventCounts["miniTicker"]++
 		eventsMu <- "miniTicker"
 		return nil
 	})
 
-	client.OnBookTickerEvent(func(event *models.BookTickerEvent) error {
+	client.HandleBookTickerEvent(func(event *models.BookTickerEvent) error {
 		eventCounts["bookTicker"]++
 		eventsMu <- "bookTicker"
 		return nil
 	})
 
-	client.OnKlineEvent(func(event *models.KlineEvent) error {
+	client.HandleKlineEvent(func(event *models.KlineEvent) error {
 		eventCounts["kline"]++
 		eventsMu <- "kline"
 		return nil
 	})
 
-	client.OnDepthEvent(func(event *models.DiffDepthEvent) error {
+	client.HandleDepthEvent(func(event *models.DiffDepthEvent) error {
 		eventCounts["depth"]++
 		eventsMu <- "depth"
 		return nil
@@ -240,7 +240,7 @@ func TestCombinedStreamSubscriptionManagement(t *testing.T) {
 	eventCount := 0
 	eventsMu := make(chan struct{}, 100)
 
-	client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		eventCount++
 		eventsMu <- struct{}{}
 		return nil
@@ -353,7 +353,7 @@ func TestSingleVsCombinedStreamComparison(t *testing.T) {
 		defer client.Disconnect()
 
 		singleEvents := 0
-		client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+		client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 			singleEvents++
 			return nil
 		})
@@ -391,12 +391,12 @@ func TestSingleVsCombinedStreamComparison(t *testing.T) {
 		combinedEvents := 0
 		regularEvents := 0
 
-		client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+		client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 			combinedEvents++
 			return nil
 		})
 
-		client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+		client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 			regularEvents++
 			return nil
 		})
@@ -443,7 +443,7 @@ func TestCombinedStreamMicrosecondPrecision(t *testing.T) {
 	eventCount := 0
 	eventsMu := make(chan struct{}, 100)
 
-	client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		eventCount++
 		eventsMu <- struct{}{}
 		t.Logf("Received microsecond precision event: %d (EventTime: %d)", eventCount, event.EventTime)

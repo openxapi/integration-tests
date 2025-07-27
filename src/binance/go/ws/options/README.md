@@ -188,6 +188,30 @@ For detailed API documentation, refer to:
 - [Binance Options API Documentation](https://binance-docs.github.io/apidocs/voptions/en/)
 - [WebSocket API Specification](https://binance-docs.github.io/apidocs/voptions/en/#websocket-api)
 
+## SDK Status
+
+✅ **SDK Fully Updated**: All event handler naming patterns have been updated!
+
+### 🔄 **Recent SDK Updates:**
+- **Event Handler Naming**: Updated from `OnXxxEvent` to `HandleXxxEventEvent` pattern
+- **Model Types**: Updated to include `Event` suffix (e.g., `AccountUpdateEvent`)
+- **Integration Tests**: All tests updated to use new method names and model types
+- **Backward Compatibility**: Old naming patterns have been replaced
+
+### Event Handler Pattern
+```go
+// Updated naming pattern for WebSocket API event handlers
+client.HandleAccountUpdateEvent(func(event *models.AccountUpdateEvent) error {
+    // Process account update events
+    return nil
+})
+
+client.HandleOrderTradeUpdateEvent(func(event *models.OrderTradeUpdateEvent) error {
+    // Process order trade update events
+    return nil
+})
+```
+
 ## Contributing
 
 When adding new tests:

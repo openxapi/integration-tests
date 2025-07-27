@@ -166,79 +166,79 @@ func (stc *StreamTestClient) IsConnected() bool {
 // SetupEventHandlers registers event handlers for all stream types
 func (stc *StreamTestClient) SetupEventHandlers() {
 	// Trade events
-	stc.client.OnTradeEvent(func(event *models.TradeEvent) error {
+	stc.client.HandleTradeEvent(func(event *models.TradeEvent) error {
 		stc.recordEvent("trade", event)
 		return nil
 	})
 
 	// Aggregate trade events
-	stc.client.OnAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
+	stc.client.HandleAggregateTradeEvent(func(event *models.AggregateTradeEvent) error {
 		stc.recordEvent("aggTrade", event)
 		return nil
 	})
 
 	// Kline events
-	stc.client.OnKlineEvent(func(event *models.KlineEvent) error {
+	stc.client.HandleKlineEvent(func(event *models.KlineEvent) error {
 		stc.recordEvent("kline", event)
 		return nil
 	})
 
 	// Mini ticker events
-	stc.client.OnMiniTickerEvent(func(event *models.MiniTickerEvent) error {
+	stc.client.HandleMiniTickerEvent(func(event *models.MiniTickerEvent) error {
 		stc.recordEvent("miniTicker", event)
 		return nil
 	})
 
 	// Ticker events
-	stc.client.OnTickerEvent(func(event *models.TickerEvent) error {
+	stc.client.HandleTickerEvent(func(event *models.TickerEvent) error {
 		stc.recordEvent("ticker", event)
 		return nil
 	})
 
 	// Book ticker events
-	stc.client.OnBookTickerEvent(func(event *models.BookTickerEvent) error {
+	stc.client.HandleBookTickerEvent(func(event *models.BookTickerEvent) error {
 		stc.recordEvent("bookTicker", event)
 		return nil
 	})
 
 	// Depth events
-	stc.client.OnDepthEvent(func(event *models.DiffDepthEvent) error {
+	stc.client.HandleDepthEvent(func(event *models.DiffDepthEvent) error {
 		stc.recordEvent("depth", event)
 		return nil
 	})
 
 	// Partial depth events
-	stc.client.OnPartialDepthEvent(func(event *models.PartialDepthEvent) error {
+	stc.client.HandlePartialDepthEvent(func(event *models.PartialDepthEvent) error {
 		stc.recordEvent("partialDepth", event)
 		return nil
 	})
 
 	// Rolling window ticker events
-	stc.client.OnRollingWindowTickerEvent(func(event *models.RollingWindowTickerEvent) error {
+	stc.client.HandleRollingWindowTickerEvent(func(event *models.RollingWindowTickerEvent) error {
 		stc.recordEvent("rollingWindowTicker", event)
 		return nil
 	})
 
 	// Average price events
-	stc.client.OnAvgPriceEvent(func(event *models.AvgPriceEvent) error {
+	stc.client.HandleAvgPriceEvent(func(event *models.AvgPriceEvent) error {
 		stc.recordEvent("avgPrice", event)
 		return nil
 	})
 
 	// Combined stream events
-	stc.client.OnCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
+	stc.client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
 		stc.recordEvent("combinedStream", event)
 		return nil
 	})
 
 	// Subscription response events
-	stc.client.OnSubscriptionResponse(func(event *models.SubscriptionResponse) error {
+	stc.client.HandleSubscriptionResponse(func(event *models.SubscriptionResponse) error {
 		stc.recordEvent("subscriptionResponse", event)
 		return nil
 	})
 
 	// Error events
-	stc.client.OnStreamError(func(event *models.ErrorResponse) error {
+	stc.client.HandleStreamError(func(event *models.ErrorResponse) error {
 		stc.recordEvent("error", event)
 		return nil
 	})
