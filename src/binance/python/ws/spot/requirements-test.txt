@@ -1,0 +1,14 @@
+# Common Test Requirements for Binance Python WebSocket API Integration Tests
+# Install with: pip install -r requirements-test.txt
+
+# Test framework dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# WebSocket proxy support
+python-socks>=2.0.0
+
+# The Binance Python WebSocket SDK (installed from local path)
+# Note: Install the SDK first with: pip install -e ../../../binance-py/
+# This allows importing: from binance.ws.spot import BinanceWebSocketClient
+-e ../../../../../../binance-py
