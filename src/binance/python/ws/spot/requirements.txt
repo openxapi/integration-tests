@@ -1,0 +1,126 @@
+# Binance Spot WebSocket API - Python Integration Tests
+# Python dependencies for integration testing
+
+# Testing framework
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-timeout>=2.1.0
+pytest-xdist>=3.0.0  # For parallel test execution
+
+# WebSocket client
+websockets>=11.0.0
+
+# Data validation and parsing
+pydantic>=2.0.0
+
+# Cryptography for authentication
+cryptography>=40.0.0
+
+# HTTP client (for any REST API fallbacks)
+httpx>=0.24.0
+
+# JSON handling
+orjson>=3.8.0  # Fast JSON parsing (optional)
+
+# Logging and monitoring
+structlog>=23.0.0  # Structured logging (optional)
+
+# Development and debugging
+pytest-cov>=4.0.0  # Coverage reporting
+pytest-html>=3.1.0  # HTML test reports
+pytest-benchmark>=4.0.0  # Performance benchmarking (optional)
+
+# Async utilities
+anyio>=3.6.0  # Async compatibility layer
+
+# Configuration management
+python-decouple>=3.6  # Environment variable management (optional)
+
+# Type checking (development)
+mypy>=1.0.0
+types-setuptools
+
+# Code formatting (development)
+black>=23.0.0
+isort>=5.12.0
+
+# Linting (development)
+flake8>=6.0.0
+pylint>=2.17.0
+
+# SDK dependencies (when available)
+# Note: The actual SDK dependencies will be added when the SDK is fixed
+# Currently the binance-py SDK is broken and cannot be installed/used
+
+# =============================================================================
+# INSTALLATION INSTRUCTIONS
+# =============================================================================
+
+# 1. Create a virtual environment:
+#    python -m venv venv
+#    source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 2. Install dependencies:
+#    pip install -r requirements.txt
+
+# 3. Install the SDK (when fixed):
+#    pip install -e ../binance-py
+
+# 4. Set up environment variables:
+#    cp env.example env.local
+#    # Edit env.local with your credentials
+#    source env.local
+
+# 5. Run tests:
+#    python -m pytest -v
+
+# =============================================================================
+# VERSION CONSTRAINTS EXPLANATION
+# =============================================================================
+
+# pytest>=7.0.0: Latest stable pytest with async support improvements
+# pytest-asyncio>=0.21.0: Required for proper async test execution
+# websockets>=11.0.0: Latest WebSocket client with security updates
+# pydantic>=2.0.0: Latest Pydantic with performance improvements
+# cryptography>=40.0.0: Required for RSA/Ed25519 signature generation
+
+# =============================================================================
+# OPTIONAL DEPENDENCIES
+# =============================================================================
+
+# For enhanced testing capabilities, you can also install:
+# pytest-mock>=3.10.0  # Mocking utilities
+# pytest-env>=0.8.0    # Environment variable management for tests
+# pytest-sugar>=0.9.0  # Better test output formatting
+# pytest-clarity>=1.0.0  # Better assertion failure messages
+
+# For development:
+# pre-commit>=3.0.0     # Git hooks for code quality
+# commitizen>=3.0.0     # Conventional commits
+
+# =============================================================================
+# SYSTEM REQUIREMENTS
+# =============================================================================
+
+# Python: 3.8+
+# Operating System: Windows, macOS, Linux
+# Memory: 256MB+ RAM available
+# Network: Internet connection for WebSocket communication
+# Disk: 100MB+ free space for dependencies
+
+# =============================================================================
+# TROUBLESHOOTING
+# =============================================================================
+
+# If you encounter dependency conflicts:
+# pip install --upgrade pip setuptools wheel
+# pip install -r requirements.txt --force-reinstall
+
+# If cryptography installation fails:
+# On Ubuntu/Debian: sudo apt-get install build-essential libffi-dev
+# On CentOS/RHEL: sudo yum install gcc openssl-devel libffi-devel
+# On Windows: Make sure you have Visual Studio Build Tools installed
+
+# If WebSocket connections fail:
+# Check firewall settings and proxy configuration
+# Verify internet connectivity to wss://testnet.binance.vision
