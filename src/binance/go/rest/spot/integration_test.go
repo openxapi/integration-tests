@@ -466,6 +466,7 @@ func (suite *TestSuite) initializeTests() {
 		{Name: "Wallet Asset Operations", Function: TestWalletAssetOperations, AuthRequired: AuthTypeUSER_DATA, Category: "Wallet"},
 		{Name: "Wallet Spot Info", Function: TestWalletSpotInfo, AuthRequired: AuthTypeUSER_DATA, Category: "Wallet"},
 		{Name: "Wallet Deposit Credit Operations", Function: TestWalletDepositCreditOperations, AuthRequired: AuthTypeTRADE, Category: "Wallet"},
+		{Name: "Travel Rule Withdraw", Function: TestTravelRuleWithdraw, AuthRequired: AuthTypeTRADE, Category: "Wallet"},
 		
 		// User Data Stream Tests
 		{Name: "User Data Stream", Function: TestUserDataStream, AuthRequired: AuthTypeUSER_DATA, Category: "Stream"},

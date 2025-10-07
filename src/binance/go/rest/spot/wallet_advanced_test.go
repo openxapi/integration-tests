@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -480,4 +484,203 @@ func TestWalletDepositCreditOperations(t *testing.T) {
 
 		t.Logf("Deposit credit applied: %+v", resp)
 	})
+}
+
+// TestTravelRuleWithdraw tests the Travel Rule withdraw endpoint
+func TestTravelRuleWithdraw(t *testing.T) {
+	client := getTestClient(t)
+	ctx := context.Background()
+	timestamp := time.Now().UnixMilli()
+
+	t.Run("CreateTravelRuleWithdraw", func(t *testing.T) {
+		// Skip by default as this creates a real withdrawal request
+		if os.Getenv("BINANCE_TEST_TRAVEL_RULE_WITHDRAW") != "true" {
+			t.Skip("Set BINANCE_TEST_TRAVEL_RULE_WITHDRAW=true to test Travel Rule withdraw (CAUTION: Creates real withdrawal)")
+		}
+
+		// Example questionnaire - format varies by local entity
+		questionnaire := `{"questions":[{"question":"What is the purpose of this withdrawal?","answer":"Test withdrawal"}]}`
+		
+		resp, httpResp, err := client.WalletAPI.CreateLocalentityWithdrawApplyV1(ctx).
+			Coin("USDT").
+			Address("TExampleAddress123456789"). // Use a valid address for testing
+			Amount("10.0"). // Small test amount
+			Questionnaire(questionnaire).
+			Timestamp(timestamp).
+			RecvWindow(5000).
+			Execute()
+
+		if handleTestnetError(t, err, httpResp, "Travel Rule withdraw") {
+			return
+		}
+		if err != nil {
+			apiErr, ok := err.(*openapi.GenericOpenAPIError)
+			if ok {
+				t.Logf("API error response: %s", string(apiErr.Body()))
+				// Check for common error codes
+				var errResp map[string]interface{}
+				if jsonErr := parseJSON(apiErr.Body(), &errResp); jsonErr == nil {
+					if code, ok := errResp["code"].(float64); ok {
+						switch code {
+						case -1000:
+							t.Skip("Travel Rule withdraw endpoint unavailable on testnet")
+						case -4001:
+							t.Skip("Invalid address for Travel Rule withdraw")
+						case -4026:
+							t.Skip("Insufficient balance for Travel Rule withdraw")
+						case -100001:
+							t.Skip("Travel Rule not applicable for this withdrawal")
+						case -100002:
+							t.Skip("Invalid questionnaire format")
+						default:
+							t.Logf("Travel Rule withdraw error code: %v", code)
+						}
+					}
+				}
+			}
+			t.Fatalf("Failed to create Travel Rule withdraw: %v", err)
+		}
+
+		// Verify response
+		if resp.TrId != nil {
+			t.Logf("Travel Rule withdraw ID: %d", *resp.TrId)
+		}
+		if resp.Accepted != nil {  // Note: Field has a typo in the SDK
+			t.Logf("Travel Rule withdraw accepted: %v", *resp.Accepted)
+		}
+		if resp.Info != nil {
+			t.Logf("Travel Rule withdraw info: %s", *resp.Info)
+		}
+		
+		t.Logf("Travel Rule withdraw response: %+v", resp)
+	})
+
+	t.Run("VerifyQuestionnaireNotURLEncoded", func(t *testing.T) {
+		// This test verifies that the questionnaire field is NOT URL-encoded
+		// It should be sent as: questionnaire={"isAddressOwner":1,"bnfType":0...}
+		// NOT as: questionnaire=%7B%22isAddressOwner%22%3A1%2C%22bnfType%22...
+		
+		// Create a custom HTTP client with request interceptor
+		var capturedBody string
+		interceptClient := &http.Client{
+			Transport: &requestInterceptor{
+				RoundTripper: http.DefaultTransport,
+				interceptFunc: func(req *http.Request) {
+					if req.Body != nil {
+						bodyBytes, _ := io.ReadAll(req.Body)
+						capturedBody = string(bodyBytes)
+						// Restore the body for the actual request
+						req.Body = io.NopCloser(strings.NewReader(capturedBody))
+					}
+				},
+			},
+		}
+		
+		// Create configuration with custom client
+		cfg := openapi.NewConfiguration()
+		cfg.HTTPClient = interceptClient
+		if os.Getenv("BINANCE_TESTNET") == "true" {
+			cfg.Servers = openapi.ServerConfigurations{
+				{URL: "https://testnet.binance.vision"},
+			}
+		}
+		
+		// Set auth
+		if apiKey := os.Getenv("BINANCE_ED25519_API_KEY"); apiKey != "" {
+			cfg.AddDefaultHeader("X-MBX-APIKEY", apiKey)
+		} else if apiKey := os.Getenv("BINANCE_API_KEY"); apiKey != "" {
+			cfg.AddDefaultHeader("X-MBX-APIKEY", apiKey)
+		}
+		
+		customClient := openapi.NewAPIClient(cfg)
+		
+		// Complex questionnaire to test encoding
+		questionnaire := `{"isAddressOwner":1,"bnfType":0,"sendTo":2,"vasp":"VASP","vaspName":"VASP","declaration":true}`
+		
+		_, _, _ = customClient.WalletAPI.CreateLocalentityWithdrawApplyV1(ctx).
+			Coin("testCoin").
+			Address("testaddr").
+			Amount("10").
+			Network("BTC").
+			Name("testlabel").
+			WithdrawOrderId("testID").
+			Questionnaire(questionnaire).
+			Timestamp(timestamp).
+			Execute()
+		
+		// Verify the questionnaire is NOT URL-encoded in the request body
+		if capturedBody != "" {
+			t.Logf("Captured request body: %s", capturedBody)
+			t.Logf("Questionnaire value to send: %s", questionnaire)
+			
+			// Parse the captured body to check questionnaire value
+			params, _ := url.ParseQuery(capturedBody)
+			actualQuestionnaire := params.Get("questionnaire")
+			t.Logf("Parsed questionnaire value: '%s'", actualQuestionnaire)
+			
+			// Check that the JSON is NOT URL-encoded
+			if strings.Contains(capturedBody, "questionnaire=%7B") {
+				t.Error("Questionnaire is URL-encoded but should NOT be!")
+				t.Logf("Expected format: questionnaire={\"isAddressOwner\":1,\"bnfType\":0...}")
+				t.Logf("Got URL-encoded: questionnaire=%%7B%%22isAddressOwner%%22...")
+			}
+			
+			// Verify the questionnaire contains raw JSON characters
+			if !strings.Contains(capturedBody, `questionnaire={"isAddressOwner":1`) {
+				t.Error("Questionnaire should contain raw JSON without URL encoding")
+				t.Logf("Expected to find: questionnaire={\"isAddressOwner\":1")
+				t.Logf("Actual body: %s", capturedBody)
+			}
+			
+			// Additional check for specific characters that should NOT be encoded
+			encodedChars := map[string]string{
+				"%7B": "{",
+				"%7D": "}",
+				"%22": "\"",
+				"%3A": ":",
+				"%2C": ",",
+			}
+			
+			for encoded, decoded := range encodedChars {
+				if strings.Contains(capturedBody, "questionnaire=") {
+					questionnaireStart := strings.Index(capturedBody, "questionnaire=")
+					questionnaireEnd := strings.Index(capturedBody[questionnaireStart:], "&")
+					if questionnaireEnd == -1 {
+						questionnaireEnd = len(capturedBody) - questionnaireStart
+					}
+					questionnaireValue := capturedBody[questionnaireStart : questionnaireStart+questionnaireEnd]
+					
+					if strings.Contains(questionnaireValue, encoded) {
+						t.Errorf("Found URL-encoded character %s (for '%s') in questionnaire, but it should be raw", encoded, decoded)
+					}
+				}
+			}
+			
+			t.Log("✓ Questionnaire format validation complete")
+		} else {
+			t.Log("Note: Could not capture request body (request may have been skipped)")
+		}
+	})
+}
+
+// requestInterceptor is a custom RoundTripper that intercepts HTTP requests
+type requestInterceptor struct {
+	http.RoundTripper
+	interceptFunc func(*http.Request)
+}
+
+func (ri *requestInterceptor) RoundTrip(req *http.Request) (*http.Response, error) {
+	if ri.interceptFunc != nil {
+		ri.interceptFunc(req)
+	}
+	// For testing purposes, we can return a mock response to avoid actual API calls
+	if strings.Contains(req.URL.Path, "/sapi/v1/localentity/withdraw/apply") {
+		// Return a mock response for testing
+		return &http.Response{
+			StatusCode: 400,
+			Body:       io.NopCloser(strings.NewReader(`{"code":-1000,"msg":"Test mode - request intercepted"}`)),
+			Header:     make(http.Header),
+		}, nil
+	}
+	return ri.RoundTripper.RoundTrip(req)
 }

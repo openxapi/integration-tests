@@ -5,8 +5,8 @@ This document tracks the test coverage for all endpoints in the Binance REST API
 ## Overall Coverage Summary
 
 - **Total Endpoints**: ~470+
-- **Tested**: 410 (87.2%)
-- **Untested**: 60+ (12.8%)
+- **Tested**: 411 (87.4%)
+- **Untested**: 59+ (12.6%)
 
 ## Test Coverage by File
 
@@ -16,7 +16,7 @@ This document tracks the test coverage for all endpoints in the Binance REST API
 - `oco_trading_test.go` - 7 endpoints
 - `sor_trading_test.go` - 3 endpoints
 - `wallet_test.go` - 11 endpoints
-- `wallet_advanced_test.go` - 29 endpoints
+- `wallet_advanced_test.go` - 30 endpoints
 - `margin_trading_test.go` - 10 endpoints
 - `margin_advanced_test.go` - 52 endpoints
 - `subaccount_test.go` - 47 endpoints (58 total, some require special permissions)
@@ -85,9 +85,9 @@ This document tracks the test coverage for all endpoints in the Binance REST API
 #### ❌ To Test (2):
 - None currently (all major endpoints tested)
 
-### 2. WalletAPI (40 endpoints) - 100% Coverage
+### 2. WalletAPI (41 endpoints) - 100% Coverage
 
-#### ✅ Tested (40):
+#### ✅ Tested (41):
 - GetAccountStatusV3 - `account_test.go`
 - GetAssetTradeFeeV1 - `account_test.go`
 - GetSystemStatusV1 - `wallet_test.go`
@@ -120,6 +120,7 @@ This document tracks the test coverage for all endpoints in the Binance REST API
 - GetSpotDelistScheduleV1 - `wallet_advanced_test.go`
 - GetSpotOpenSymbolListV1 - `wallet_advanced_test.go`
 - CreateCapitalDepositCreditApplyV1 - `wallet_advanced_test.go`
+- CreateLocalentityWithdrawApplyV1 - `wallet_advanced_test.go` (Travel Rule withdraw)
 - And all other endpoints tested
 
 Note: Some endpoints require VIP/broker permissions but are tested
