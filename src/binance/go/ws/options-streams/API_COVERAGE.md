@@ -1,246 +1,144 @@
-# Binance Options WebSocket Streams API Coverage
+Binance Options WS SDK — Integration Coverage
 
-This document tracks the test coverage for Binance Options WebSocket Streams APIs.
+SDK: `github.com/openxapi/binance-go/ws/options-streams`
+REST: `github.com/openxapi/binance-go/rest/options`
 
-## Overall Coverage Summary
+Notes
+- Request methods accept a third argument: pointer to per‑request callback (e.g., `*func(context.Context, *models.SubscriptionResponse) error`). Tests pass concrete callbacks and assert ids/fields.
+- One IntegrationTestSuite per channel: Market, Combined, User Data. Field‑level assertions are performed for each event type where market activity exists.
 
-**Total Stream Types**: 9  
-**Tested Stream Types**: 9 (full event handling)  
-**Coverage**: 100% ✅ (fully functional with updated SDK)
-**Latest Test Run**: All tests passed (100% success rate, 297.89s duration)
+Coverage Summary
+- MarketStreamsChannel: 100% of request methods and event handlers covered.
+- CombinedMarketStreamsChannel: 100% of request methods and event handlers (incl. wrapper) covered.
+- UserDataStreamsChannel: Connect/Disconnect and all event handlers covered (requires API keys).
+- Stream builders and typed params: covered for all stream types used in tests.
+- Core Client / Server management / WS Auth: pending (relied on SDK defaults in tests).
 
-✅ **Major Update**: The Options-Streams SDK has been significantly updated with comprehensive event handlers, proper WebSocket connections, and dynamic symbol selection. All critical issues have been resolved.
+Client (type `Client`)
+- [x] NewClient() *Client
+- [ ] NewClientWithAuth(auth *Auth) *Client
+- [ ] SetAuth(auth *Auth)
+- [ ] AddServer(name, serverURL, title, description string) error
+- [ ] AddOrUpdateServer(name, serverURL, title, description string) error
+- [ ] RemoveServer(name string) error
+- [ ] UpdateServer(name, serverURL, title, description string) error
+- [ ] SetActiveServer(name string) error
+- [x] GetActiveServer() *ServerInfo
+- [ ] GetServer(name string) *ServerInfo
+- [ ] ListServers() map[string]*ServerInfo
+- [ ] GetCurrentURL() string
+- [ ] GetURL() string (deprecated alias)
+- [ ] RegisterHandlers(channel string, m map[string]func(context.Context, []byte) error)
+- [ ] Wait(ctx context.Context) error
 
-## Detailed Coverage
+Server Management (type `ServerManager`, `ServerInfo`)
+- [ ] NewServerManager() *ServerManager
+- [ ] (sm) AddServer(name string, server *ServerInfo) error
+- [ ] (sm) AddOrUpdateServer(name string, server *ServerInfo) error
+- [ ] (sm) RemoveServer(name string) error
+- [ ] (sm) UpdateServer(name string, server *ServerInfo) error
+- [ ] (sm) UpdateServerPathname(name string, pathname string) error
+- [ ] (sm) ResolveServerURL(name string, variables map[string]string) (string, error)
+- [ ] (sm) SetActiveServer(name string) error
+- [ ] (sm) GetActiveServer() *ServerInfo
+- [ ] (sm) GetServer(name string) *ServerInfo
+- [ ] (sm) ListServers() map[string]*ServerInfo
+- [ ] (sm) GetActiveServerURL() string
 
-### Stream Types Coverage
+Auth & Signing (types `Auth`, `RequestSigner`)
+- [ ] NewAuth(apiKey string) *Auth
+- [ ] (a) SetSecretKey(secretKey string)
+- [ ] (a) SetPrivateKey(privateKey []byte) error
+- [ ] (a) SetPrivateKeyPath(path string)
+- [ ] (a) SetPrivateKeyReader(reader io.Reader)
+- [ ] (a) SetPassphrase(passphrase string)
+- [ ] (a) ContextWithValue(ctx context.Context) (context.Context, error)
+- [ ] NewRequestSigner(auth *Auth) *RequestSigner
+- [ ] (s) EnsureInitialized() error
+- [ ] (s) SignRequest(params map[string]interface{}, authType AuthType) error
+- [ ] GetAuthTypeFromMessageName(messageName string) AuthType
+- [ ] RequiresSignature(authType AuthType) bool
 
-| Stream Type | Pattern | Tested | Test File | Event Model | Dynamic Symbols | Notes |
-|-------------|---------|--------|-----------|-------------|----------------|-------|
-| **Index Price** | `{symbol}@index` | ✅ | `streams_test.go` | `IndexPriceEvent` | ✅ | Uses ETHUSDT@index with proper event handling |
-| **Kline/Candlestick** | `{symbol}@kline_{interval}` | ✅ | `streams_test.go` | `KlineEvent` | ✅ | Dynamic ATM symbol selection, fixed JSON parsing |
-| **Mark Price** | `{underlyingAsset}@markPrice` | ✅ | `streams_test.go` | `MarkPriceEvent` | ✅ | Tests ETH@markPrice with array handling |
-| **New Symbol Info** | `option_pair` | ✅ | `streams_test.go` | `NewSymbolInfoEvent` | N/A | Tests option_pair stream for new listings |
-| **Open Interest** | `{underlyingAsset}@openInterest@{expirationDate}` | ✅ | `streams_test.go` | `OpenInterestEvent` | ✅ | Dynamic expiration date selection |
-| **Partial Depth** | `{symbol}@depth{levels}[@{speed}]` | ✅ | `streams_test.go` | `PartialDepthEvent` | ✅ | Multiple levels/speeds with dynamic symbols |
-| **Individual Ticker** | `{symbol}@ticker` | ✅ | `streams_test.go` | `TickerEvent` | ✅ | **Dynamic BTC ATM symbol selection** |
-| **Ticker by Underlying** | `{underlyingAsset}@ticker@{expirationDate}` | ✅ | `streams_test.go` | `TickerByUnderlyingEvent` | ✅ | Dynamic expiration dates |
-| **Trade** | `{symbol}@trade` or `{underlyingAsset}@trade` | ✅ | `streams_test.go` | `TradeEvent` | ✅ | Tests both individual and underlying patterns |
+Stream Builders & Typed Params (package functions/types)
+- [x] BuildIndexPriceEventStream
+- [x] BuildKlineEventStream
+- [x] BuildMarkPriceEventStream
+- [x] BuildTickerEventStream
+- [x] BuildTickerByUnderlyingEventStream
+- [x] BuildTradeEventStream
+- [x] BuildPartialDepthEventStream
+- [x] BuildNewSymbolInfoEventStream
+- [x] BuildOpenInterestEventStream
+- [x] IndexPriceEventStreamParams.Values()
+- [x] KlineEventStreamParams.Values()
+- [x] MarkPriceEventStreamParams.Values()
+- [x] TickerEventStreamParams.Values()
+- [x] TickerByUnderlyingEventStreamParams.Values()
+- [x] TradeEventStreamParams.Values()
+- [x] PartialDepthEventStreamParams.Values()
+- [x] OpenInterestEventStreamParams.Values()
 
-### Event Handler Coverage
+Market Streams (type `MarketStreamsChannel`, key: `marketStreams`)
+- [x] NewMarketStreamsChannel(client *Client) *MarketStreamsChannel
+- [x] Connect(ctx context.Context, streamName string) error
+- [x] Disconnect(ctx context.Context) error
+- [x] SubscribeToMarketStreams(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscriptionResponse) error) error
+- [x] UnsubscribeFromMarketStreams(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscriptionResponse) error) error
+- [x] ListSubscriptionsFromMarketStreams(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
+- [x] SetPropertyOnMarketStreams(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
+- [x] GetPropertyFromMarketStreams(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
+- [x] HandleNewSymbolInfoEvent(fn func(context.Context, *models.NewSymbolInfoEvent) error)
+- [x] HandleOpenInterestEvent(fn func(context.Context, *models.OpenInterestEvent) error)
+- [x] HandleMarkPriceEvent(fn func(context.Context, *models.MarkPriceEvent) error)
+- [x] HandleKlineEvent(fn func(context.Context, *models.KlineEvent) error)
+- [x] HandleTickerByUnderlyingEvent(fn func(context.Context, *models.TickerByUnderlyingEvent) error)
+- [x] HandleIndexPriceEvent(fn func(context.Context, *models.IndexPriceEvent) error)
+- [x] HandleTickerEvent(fn func(context.Context, *models.TickerEvent) error)
+- [x] HandleTradeEvent(fn func(context.Context, *models.TradeEvent) error)
+- [x] HandlePartialDepthEvent(fn func(context.Context, *models.PartialDepthEvent) error)
+- [x] HandleErrorMessage(fn func(context.Context, *models.ErrorMessage) error)
 
-| Event Handler | SDK Status | Test Status | Test File | Implementation Status |
-|---------------|------------|-------------|-----------|---------------------|
-| `OnIndexPriceEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Complete with typed handlers |
-| `OnKlineEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Fixed JSON parsing issues |
-| `OnMarkPriceEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Array stream handling |
-| `OnNewSymbolInfoEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | New symbol detection |
-| `OnOpenInterestEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Open interest tracking |
-| `OnPartialDepthEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Order book updates |
-| `OnTickerEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Individual ticker with Greeks |
-| `OnTickerByUnderlyingEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Aggregated ticker stats |
-| `OnTradeEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Trade execution data |
-| `OnCombinedStreamEvent` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Combined stream handling |
-| `OnSubscriptionResponse` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Subscription management |
-| `OnStreamError` | ✅ **FULLY IMPLEMENTED** | ✅ **COMPREHENSIVE** | `integration_test.go` | Error handling |
+Combined Market Streams (type `CombinedMarketStreamsChannel`, key: `combinedMarketStreams`)
+- [x] NewCombinedMarketStreamsChannel(client *Client) *CombinedMarketStreamsChannel
+- [x] Connect(ctx context.Context, streams string) error
+- [x] Disconnect(ctx context.Context) error
+- [x] SubscribeToCombinedMarketStreams(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscriptionResponse) error) error
+- [x] UnsubscribeFromCombinedMarketStreams(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscriptionResponse) error) error
+- [x] ListSubscriptionsFromCombinedMarketStreams(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
+- [x] SetPropertyOnCombinedMarketStreams(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
+- [x] GetPropertyFromCombinedMarketStreams(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
+- [x] HandleCombinedStreamData(fn func(context.Context, *models.CombinedMarketStreamsEvent) error)
+- [x] HandleErrorMessage(fn func(context.Context, *models.ErrorMessage) error)
+- [x] HandleNewSymbolInfoEvent(fn func(context.Context, *models.NewSymbolInfoEvent) error)
+- [x] HandleOpenInterestEvent(fn func(context.Context, *models.OpenInterestEvent) error)
+- [x] HandleMarkPriceEvent(fn func(context.Context, *models.MarkPriceEvent) error)
+- [x] HandleKlineEvent(fn func(context.Context, *models.KlineEvent) error)
+- [x] HandleTickerByUnderlyingEvent(fn func(context.Context, *models.TickerByUnderlyingEvent) error)
+- [x] HandleIndexPriceEvent(fn func(context.Context, *models.IndexPriceEvent) error)
+- [x] HandleTickerEvent(fn func(context.Context, *models.TickerEvent) error)
+- [x] HandleTradeEvent(fn func(context.Context, *models.TradeEvent) error)
+- [x] HandlePartialDepthEvent(fn func(context.Context, *models.PartialDepthEvent) error)
 
-**Legend:**
-- ✅ **FULLY IMPLEMENTED**: Complete SDK implementation with proper event typing
-- ✅ **COMPREHENSIVE**: Full test coverage including error scenarios and edge cases
+User Data Streams (type `UserDataStreamsChannel`, key: `userDataStreams`)
+- [x] NewUserDataStreamsChannel(client *Client) *UserDataStreamsChannel
+- [x] Connect(ctx context.Context, listenKey string) error
+- [x] Disconnect(ctx context.Context) error
+- [x] HandleAccountUpdateEvent(fn func(context.Context, *models.AccountUpdateEvent) error)
+- [x] HandleOrderTradeUpdateEvent(fn func(context.Context, *models.OrderTradeUpdateEvent) error)
+- [x] HandleRiskLevelChangeEvent(fn func(context.Context, *models.RiskLevelChangeEvent) error)
 
-### Connection Management Coverage
+Validation Approach
+- Request/response: assert `id` echo, presence and shape of result arrays, and error messages when present.
+- Events: assert `e` types, symbol formats, timestamps recency, and numeric fields; optional REST cross‑checks for index/mark/ticker when `ENABLE_REST_VALIDATION=1`.
+- Robustness: suites fail if the SDK logs any `unhandled message:` during execution.
 
-| Feature | Tested | Test File | Status | Implementation |
-|---------|--------|-----------|---------|--------------| 
-| Basic Connection | ✅ | `connection_test.go` | ✅ Working | WebSocket connection establishment |
-| Server Management | ✅ | `connection_test.go` | ✅ Working | Add/remove/update servers |
-| Active Server Switching | ✅ | `connection_test.go` | ✅ Working | Change active server |
-| Connection Resilience | ✅ | `connection_test.go` | ✅ Working | Error recovery |
-| **Stream Path Connection** | ✅ | `enhanced_features_test.go` | ✅ **FIXED** | **Proper URL construction (/ws/ prefix)** |
-| **Concurrent Streams** | ✅ | `enhanced_features_test.go` | ✅ **FIXED** | **Multiple simultaneous connections** |
-| **High Volume Streams** | ✅ | `enhanced_features_test.go` | ✅ **FIXED** | **Dedicated client management** |
-| Subscribe/Unsubscribe | ✅ | `integration_test.go` | ✅ Working | Stream subscription management |
-| List Subscriptions | ✅ | `integration_test.go` | ✅ Working | Active subscription tracking |
-| Health Checks | ✅ | `connection_test.go` | ✅ Working | Connection status monitoring |
+Known Behaviors
+- `SET_PROPERTY`/`GET_PROPERTY` may not ACK in all environments; tests treat timeouts as informational when they occur under short deadlines.
+- Options market activity is variable; suites use graceful timeouts to avoid false negatives when streams are quiet.
 
-### Critical Fixes Implemented
+Next Steps
+- Add coverage for core `Client` methods (server CRUD, `RegisterHandlers`, `Wait`).
+- Cover ServerManager helpers and URL resolution.
+- Add WS auth/signing coverage if/when private WS messages require it.
+- Expand negative/edge‑case tests (bad params, unsubscribed list checks, etc.).
 
-#### 1. Dynamic Symbol Selection ✅
-- **File**: `symbol_helper.go`
-- **Features**:
-  - REST API integration for active symbol retrieval
-  - Intelligent ATM (At-The-Money) selection algorithm
-  - Current market price-based symbol selection
-  - Automatic fallback handling
-  - Symbol caching for performance
-
-#### 2. WebSocket URL Construction ✅  
-- **Issue Fixed**: "bad handshake" errors due to malformed URLs
-- **Root Cause**: Missing `/ws/` path component
-- **Solution**: Use `ConnectToStream()` instead of `ConnectWithStreamPath()`
-- **Impact**: All stream connections now work properly
-
-#### 3. JSON Parsing Fixes ✅
-- **Kline Events**: Fixed FirstTradeId/LastTradeId type mismatch (int64 → string)
-- **Mark Price Events**: Added array stream processing support  
-- **Event Detection**: Improved stream message routing logic
-
-#### 4. Error Monitoring System ✅
-- **File**: `error_monitor.go` 
-- **Features**:
-  - Real-time SDK error detection
-  - Test failure on parsing errors
-  - Comprehensive error logging
-  - Graceful timeout handling for low activity
-
-#### 5. Test Infrastructure Improvements ✅
-- **Shared vs Dedicated Clients**: Proper client management for different test scenarios
-- **Connection Conflict Resolution**: Dedicated clients for concurrent testing
-- **Enhanced Error Handling**: Better detection of SDK vs network issues
-- **Improved Logging**: Clear distinction between expected and actual failures
-
-### Stream Variations Coverage
-
-#### Kline Intervals
-| Interval | Tested | Dynamic Symbol | Notes |
-|----------|--------|----------------|-------|
-| 1m | ✅ | ✅ | Primary test interval with ATM symbol |
-| 3m | ✅ | ✅ | Additional interval testing |
-| 5m | ✅ | ✅ | Additional interval testing |
-| 15m | ✅ | ✅ | Additional interval testing |
-| 30m | ✅ | ✅ | Additional interval testing |
-| 1h | ✅ | ✅ | Additional interval testing |
-| 1d | ✅ | ✅ | Additional interval testing |
-
-#### Partial Depth Levels  
-| Level | Tested | Dynamic Symbol | Notes |
-|-------|--------|----------------|-------|
-| 10 | ✅ | ✅ | Primary test level |
-| 20 | ✅ | ✅ | Additional level testing |
-| 50 | ✅ | ✅ | Additional level testing |
-| 100 | ✅ | ✅ | Additional level testing |
-
-#### Partial Depth Speeds
-| Speed | Tested | Notes |
-|-------|--------|-------|
-| 100ms | ✅ | High frequency updates |
-| 500ms | ✅ | Default speed |
-| 1000ms | ✅ | Low frequency updates |
-
-### Advanced Features Coverage
-
-| Feature | Tested | Test File | Status | Implementation |
-|---------|--------|-----------|---------|--------------| 
-| **Dynamic Symbol Selection** | ✅ | All test files | ✅ **NEW** | **ATM symbol selection with REST API** |
-| **Combined Streams** | ✅ | `enhanced_features_test.go` | ✅ Working | Multi-stream handling |
-| **Error Handling** | ✅ | `enhanced_features_test.go` | ✅ Enhanced | **SDK error detection and test failure** |
-| **Concurrent Streams** | ✅ | `enhanced_features_test.go` | ✅ **FIXED** | **Proper URL construction** |
-| **High Volume Handling** | ✅ | `enhanced_features_test.go` | ✅ **FIXED** | **Dedicated client management** |
-| **Event Recording** | ✅ | `integration_test.go` | ✅ Working | Event tracking and verification |
-| **Graceful Timeouts** | ✅ | All test files | ✅ Enhanced | **Distinguish SDK errors from timeouts** |
-| **Real-time Error Monitoring** | ✅ | All test files | ✅ **NEW** | **Live SDK parsing error detection** |
-
-## Test Quality Metrics
-
-### Test Types
-- **Unit Tests**: 0 (Integration-focused)
-- **Integration Tests**: 16 (all stream types + advanced features)
-- **Performance Tests**: 3 (concurrent, high volume, stress)
-- **Error Handling Tests**: 4 (SDK errors, network errors, invalid streams)
-- **Connection Tests**: 5 (basic, resilience, management)
-
-### Coverage Quality
-- **Event Models**: 100% covered with proper typing
-- **Stream Patterns**: 100% covered with dynamic symbols
-- **Error Scenarios**: Comprehensive SDK and network error handling
-- **Performance**: Multi-stream concurrent testing
-- **Documentation**: Complete with troubleshooting guides
-
-### Test Success Metrics
-- **Overall Success Rate**: 100% ✅
-- **Connection Success Rate**: 100% ✅ (fixed URL issues)
-- **Dynamic Symbol Selection**: 100% ✅ (REST API integration)
-- **Event Handler Coverage**: 100% ✅ (all SDK methods tested)
-- **Error Detection**: 100% ✅ (SDK parsing errors caught)
-
-## Current Status: Production Ready ✅
-
-### ✅ Fully Functional Features
-1. **All Stream Connections**: Proper WebSocket URL construction
-2. **All Event Handlers**: Complete SDK event handling implementation  
-3. **Dynamic Symbol Selection**: Intelligent ATM option selection
-4. **Error Monitoring**: Real-time SDK error detection
-5. **Concurrent Testing**: Multi-stream connection management
-6. **Performance Testing**: High-volume stream handling
-7. **Graceful Handling**: Proper timeout and low-activity scenarios
-
-### ✅ Recently Fixed Critical Issues
-1. **WebSocket Connection Failures** → Fixed URL construction (`/ws/` path)
-2. **JSON Parsing Errors** → Fixed type mismatches in Kline events
-3. **Hardcoded Expired Symbols** → Dynamic REST API symbol selection
-4. **SDK Error Masking** → Real-time error detection and test failure
-5. **Connection Conflicts** → Proper shared vs dedicated client management
-
-### Current Limitations
-- **Market Activity Dependent**: Options markets have lower activity than spot/futures
-- **Mainnet Only**: No testnet available for options streams
-- **Real Data**: Tests use live market data (realistic but variable)
-
-## Future Enhancements
-
-### Planned Additions
-1. **Extended Kline Intervals**: Test remaining intervals (2h, 4h, 6h, 12h, 3d, 1w)
-2. **Authentication Testing**: If private options streams become available
-3. **Greeks Validation**: Detailed validation of Delta, Gamma, Theta, Vega calculations
-4. **Historical Data Testing**: Test historical data accuracy if available
-5. **Microsecond Precision**: Test timestamp precision features
-
-### Monitoring
-- **Stream Availability**: Monitor for new stream types
-- **API Changes**: Track Binance Options API updates  
-- **Performance**: Monitor connection and event processing performance
-- **Error Patterns**: Track common error scenarios and edge cases
-- **Symbol Coverage**: Monitor options market for new underlying assets
-
-## Test Execution Statistics
-
-### Typical Results (After Fixes)
-- **Connection Success Rate**: 100% ✅ (fixed URL construction)
-- **Event Reception**: Variable (market dependent, but connections always succeed)
-- **Error Handling**: 100% ✅ (comprehensive SDK error detection)
-- **Performance**: Handles 10+ concurrent streams reliably
-- **Dynamic Symbol Selection**: 100% success with ATM algorithm
-
-### Execution Time
-- **Full Suite**: ~15-20 seconds (improved efficiency)
-- **Individual Tests**: 3-10 seconds each (optimized connections)
-- **Performance Tests**: 10-15 seconds each (concurrent execution)
-- **Symbol Selection**: <5 seconds (REST API caching)
-
-## Maintenance Notes
-
-### Regular Updates Needed
-1. **Symbol Cache**: Automatic expiration and refresh (5-minute TTL)
-2. **REST API Monitoring**: Track any changes to Options REST API endpoints
-3. **Market Hours**: Consider market activity when interpreting test results
-4. **SDK Updates**: Monitor for new SDK releases and features
-
-### Dependencies
-- **SDK Version**: Latest options-streams SDK with full event handler support
-- **REST API**: Binance Options REST API for dynamic symbol selection  
-- **Go Version**: Go 1.19+ (for generic type support)
-- **Network Stability**: Reliable connection for WebSocket streams
-
-### Key Files for Maintenance
-- `symbol_helper.go`: Dynamic symbol selection and REST API integration
-- `error_monitor.go`: SDK error detection and monitoring  
-- `integration_test.go`: Core test infrastructure and event handling
-- `enhanced_features_test.go`: Advanced features and concurrent testing
-- `streams_test.go`: Individual stream type testing
-
----
-
-**Last Updated**: January 2025 (Major SDK improvements and fixes)  
-**Next Review**: Monitor for SDK updates or API changes  
-**Maintained By**: Integration test team  
-**Status**: ✅ Production Ready - All critical issues resolved

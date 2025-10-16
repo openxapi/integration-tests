@@ -1,245 +1,113 @@
 # Binance Options WebSocket Streams Integration Tests
 
-This directory contains comprehensive integration tests for the Binance Options WebSocket Streams SDK.
+This directory contains integration tests for the Binance Options WebSocket Streams SDK. The tests exercise request/response flows and all event handlers for each Options WS channel.
 
 ## Overview
 
-The integration tests verify that the Binance Options WebSocket Streams SDK functions correctly against the live Binance Options WebSocket API. These tests cover all available options stream types, connection management, error handling, and advanced features.
+- Targets the SDK at `github.com/openxapi/binance-go/ws/options-streams` (WS) and `github.com/openxapi/binance-go/rest/options` (REST for symbol discovery/validation).
+- Uses Binance mainnet WS/REST by default; no credentials required for public market data. User Data streams require API keys.
+- Each channel has its own IntegrationTestSuite that validates request methods and event handler payloads.
 
-## Features Tested
+## Streams Covered
 
-### Stream Types Covered
+| Stream | Pattern | Description | Event |
+|-------|---------|-------------|-------|
+| Index Price | `{pair}@index` | Underlying index price (e.g., `BTCUSDT@index`) | `IndexPriceEvent` |
+| Kline | `{symbol}@kline_{interval}` | OHLCV for an option contract | `KlineEvent` |
+| Mark Price | `{underlying}@markPrice` | Mark prices for all options on underlying | `MarkPriceEvent` |
+| New Symbol Info | `option_pair` | New option listings stream | `NewSymbolInfoEvent` |
+| Open Interest | `{underlying}@openInterest@{expiration}` | Open interest snapshots | `OpenInterestEvent` |
+| Partial Depth | `{symbol}@depth{levels}[@{speed}]` | Level 2 orderbook | `PartialDepthEvent` |
+| Ticker (by symbol) | `{symbol}@ticker` | 24h stats for one option | `TickerEvent` |
+| Ticker (by underlying) | `{underlying}@ticker@{expiration}` | Aggregated by expiry | `TickerByUnderlyingEvent` |
+| Trade | `{symbol}@trade` or `{underlying}@trade` | Trade stream | `TradeEvent` |
 
-| Stream Type | Pattern | Description | Event Model |
-|-------------|---------|-------------|-------------|
-| **Index Price** | `{symbol}@index` | Index price for underlying assets | `IndexPriceEvent` |
-| **Kline/Candlestick** | `{symbol}@kline_{interval}` | OHLCV data for options contracts | `KlineEvent` |
-| **Mark Price** | `{underlyingAsset}@markPrice` | Mark prices for all options on underlying | `MarkPriceEvent` |
-| **New Symbol Info** | `option_pair` | New option symbol listings | `NewSymbolInfoEvent` |
-| **Open Interest** | `{underlyingAsset}@openInterest@{expirationDate}` | Open interest data | `OpenInterestEvent` |
-| **Partial Depth** | `{symbol}@depth{levels}[@{speed}]` | Order book depth data | `PartialDepthEvent` |
-| **Individual Ticker** | `{symbol}@ticker` | 24h statistics for specific options | `TickerEvent` |
-| **Ticker by Underlying** | `{underlyingAsset}@ticker@{expirationDate}` | Aggregated ticker data | `TickerByUnderlyingEvent` |
-| **Trade** | `{symbol}@trade` or `{underlyingAsset}@trade` | Real-time trade data | `TradeEvent` |
+## Environment Setup
 
-### Connection Features
-
-- **Server Management**: Add, remove, update, and switch between servers
-- **Connection Resilience**: Error handling and recovery mechanisms
-- **Multiple Connections**: Concurrent stream handling
-- **Connection Health**: Status monitoring and verification
-
-### Advanced Features
-
-- **Combined Streams**: Multi-stream event handling
-- **Event Processing**: Type-safe event handlers for all stream types
-- **Error Handling**: Comprehensive error detection and reporting
-- **Performance Testing**: High-volume and concurrent stream testing
-
-## Options Market Data Features
-
-The tests verify proper handling of options-specific data including:
-
-- **Greeks**: Delta, Theta, Gamma, Vega (in ticker streams)
-- **Implied Volatility**: IV calculations and updates
-- **Strike Prices**: Option contract specifications
-- **Expiration Dates**: Contract expiry information
-- **Option Types**: Call/Put option identification
-- **Risk Metrics**: Mark prices and estimated exercise prices
-
-## Test Configuration
-
-### Environment Setup
-
-1. Copy the environment template:
+1. Copy and edit env:
    ```bash
    cp env.example env.local
+   # Edit values as needed, then
+   source env.local
    ```
 
-2. Configure test parameters in `env.local`:
-   ```bash
-   # Note: Most options streams are public and don't require authentication
-   DEFAULT_SYMBOL=BTC-240329-50000-C
-   DEFAULT_UNDERLYING=BTC
-   DEFAULT_EXPIRATION=240329
-   DEFAULT_INTERVAL=1m
-   ```
-
-### Authentication
-
-Most options streams are **public** and don't require API credentials. Authentication is only needed for:
-- Subscribe/Unsubscribe operations (if supported)
-- Private user data streams (if any)
+2. Notable variables (see `env.example`):
+   - `BINANCE_API_KEY`, `BINANCE_SECRET_KEY` – only required for User Data streams.
+   - `BINANCE_OPTIONS_REST_SERVER` – override REST base (defaults to `https://eapi.binance.com`).
+   - `ENABLE_REST_VALIDATION` – `1/true` enables REST cross-checks in assertions.
+   - `PREFERRED_UNDERLYING` – comma list to bias underlying selection (e.g., `BTC,ETH`).
+   - `DEFAULT_INTERVAL` – kline interval (e.g., `1m`).
+   - `EVENT_WAIT_SECS` – base event wait (default 20s; some suites use longer waits).
+   - Optional order test knobs (User Data): `ENABLE_USERDATA_ORDER_TESTS=1`, `TEST_ORDER_QTY`, `TEST_ORDER_PRICE`, `TEST_ORDER_SIDE`, `TEST_ORDER_TIF`.
 
 ## Running Tests
 
-### Quick Start
-
+Quick start:
 ```bash
-# Run all tests
 go test -v
+```
 
-# Run with extended timeout for thorough testing
+Per‑channel suites:
+```bash
+go test -v -run TestFullIntegrationSuite_Market
+go test -v -run TestFullIntegrationSuite_Combined
+go test -v -run TestFullIntegrationSuite_UserData   # requires API keys
+```
+
+Helpful flags/env:
+```bash
 go test -v -timeout 20m
-```
-
-### Specific Test Categories
-
-```bash
-# Test connection functionality
-go test -v -run TestConnection
-
-# Test individual stream types
-go test -v -run TestIndexPriceStream
-go test -v -run TestKlineStream
-go test -v -run TestMarkPriceStream
-go test -v -run TestTickerStream
-
-# Test advanced features
-go test -v -run TestCombinedStreamEventHandler
-go test -v -run TestConcurrentStreams
-
-# Run the complete integration suite
-go test -v -run TestFullIntegrationSuite
-```
-
-### Performance Testing
-
-```bash
-# Test high-volume streams
-go test -v -run TestHighVolumeStreams
-
-# Test concurrent connections
-go test -v -run TestConcurrentStreams
+EVENT_WAIT_SECS=30 ENABLE_REST_VALIDATION=1 go test -v -run TestFullIntegrationSuite_Market
+go test -short  # skips long-running integration suites
 ```
 
 ## Test Structure
 
-### Core Files
+Core files in this module:
+- `main_test.go` – entry and printed summary, per‑suite runners.
+- `integration_test.go` – shared/dedicated client helpers and utilities.
+- `market_channel_test.go` – MarketStreamsChannel suite (requests + events).
+- `combined_channel_test.go` – CombinedMarketStreamsChannel suite (requests + events).
+- `user_data_channel_test.go` – UserDataStreamsChannel suite (events; needs keys).
+- Helpers: `assert_helpers_test.go`, `log_helpers_test.go`, `rest_helpers_test.go`, `symbol_helper.go`, `test_timing_helpers_test.go`.
 
-- `integration_test.go` - Main test client and utilities
-- `main_test.go` - Test suite orchestration and summary
-- `connection_test.go` - Connection and server management tests
-- `streams_test.go` - Individual stream type tests
-- `enhanced_features_test.go` - Advanced feature and performance tests
-
-### Test Architecture
-
-The tests use a sophisticated architecture featuring:
-
-- **Shared Client Management**: Efficient resource utilization across tests
-- **Dedicated Clients**: Isolated testing for specific scenarios
-- **Event Recording**: Comprehensive event tracking and verification
-- **Graceful Timeouts**: Handling low-activity periods on mainnet
-- **Error Recovery**: Automatic reconnection and error handling
+Architecture highlights:
+- Shared and dedicated client helpers minimize reconnect churn.
+- Stream path builders from the SDK are used to construct correct subscription strings.
+- Each request method is validated via per‑request callbacks (id/fields).
+- Event handlers are registered globally in each suite and validated field‑by‑field.
+- Graceful timeouts are used due to lower Options market activity.
 
 ## Expected Behavior
 
-### Market Activity Considerations
-
-Options markets typically have lower activity than spot or futures markets, so:
-
-- **Timeouts are Expected**: Many tests use graceful timeout handling
-- **Event Frequency**: Some streams may have infrequent updates
-- **Market Hours**: Activity varies by time of day and market conditions
-- **Contract Popularity**: Some option contracts have very low trading volume
-
-### Success Criteria
-
-Tests are considered successful when they:
-
-1. **Establish Connections**: Successfully connect to WebSocket endpoints
-2. **Receive Events**: Get at least one event (if market is active)
-3. **Handle Timeouts Gracefully**: Don't fail on expected low activity
-4. **Verify Data Structure**: Ensure events match expected models
-5. **Test Functionality**: Verify SDK methods work as intended
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Connection Timeouts**
-   - Increase timeout values in test configuration
-   - Check network connectivity to Binance
-
-2. **No Events Received**
-   - This is often expected due to low options trading activity
-   - Tests use graceful timeout handling for this scenario
-
-3. **Stream Not Available**
-   - Some option symbols may not exist or be delisted
-   - Update test symbols to currently active contracts
-
-### Debug Mode
-
-Enable verbose logging to see detailed event information:
-
-```bash
-go test -v -run TestFullIntegrationSuite 2>&1 | tee test.log
-```
+Options markets can be quiet; timeouts with “acceptable” log notes are not failures. Tests succeed when connections establish, responses are ACKed where applicable, and at least one well‑formed event is observed (when market activity exists). Some endpoints (e.g., `SET_PROPERTY`/`GET_PROPERTY`) may time out on certain servers; tests treat this as informational when appropriate.
 
 ## SDK Status
 
-✅ **SDK Fully Updated**: All event handler naming patterns have been updated!
+- Event handler names follow `HandleXxxEvent` (updated from older `OnXxxEvent`).
+- Tests also fail fast if the SDK logs any “unhandled message:” lines during a suite.
 
-### 🔄 **Recent SDK Updates:**
-- **Event Handler Naming**: Updated from `OnXxxEvent` to `HandleXxxEvent` pattern
-- **Integration Tests**: All tests updated to use new `HandleXxxEvent` method names
-- **Backward Compatibility**: Old `OnXxxEvent` methods have been replaced
-
-### Event Handler Pattern
-```go
-// Updated naming pattern for all event handlers
-client.HandleCombinedStreamEvent(func(event *models.CombinedStreamEvent) error {
-    // Process combined stream events
-    return nil
-})
-
-client.HandleTradeEvent(func(event *models.TradeEvent) error {
-    // Process trade events
-    return nil
-})
-```
-
-## Development Notes
-
-### Adding New Tests
-
-When adding tests for new features:
-
-1. Follow the existing naming convention: `Test{FeatureName}`
-2. Use the shared client pattern for efficiency
-3. Include graceful timeout handling for low-activity scenarios
-4. Add comprehensive event verification
-5. Update the test suite in `main_test.go`
-
-### Stream Path Format
-
-Options streams use specific path formats:
+## Stream Path Examples
 
 ```
-# Individual option symbol
-BTC-250328-50000-C@{streamType}
+# Pair‑based index
+BTCUSDT@index
 
-# Underlying asset aggregation  
-{underlying}@{streamType}[@{expiration}]
+# Kline on an option contract
+BTC-250328-50000-C@kline_1m
 
-# Examples
-BTC-250328-50000-C@ticker          # Individual option ticker
-ETH@markPrice                      # All ETH options mark prices
-BTC@openInterest@250328           # Open interest for BTC options expiring 250328
+# Underlying‑scoped streams
+ETH@markPrice
+BTC@openInterest@250328
 ```
 
 ## API Coverage
 
-See `API_COVERAGE.md` for detailed information about:
-- Tested vs untested stream types
-- Coverage statistics
-- Known limitations
-- Future test expansion plans
+See `API_COVERAGE.md` for a checklist of covered exported methods and next steps.
 
-## Related Documentation
+## References
 
-- [Binance Options API Documentation](https://binance-docs.github.io/apidocs/voptions/en/)
-- [SDK Documentation](../../../../../../binance-go/ws/options-streams/README.md)
-- [WebSocket Streams Guide](https://binance-docs.github.io/apidocs/voptions/en/#websocket-streams)
+- Binance Options API: https://binance-docs.github.io/apidocs/voptions/en/
+- SDK WS README: ../../../../../../binance-go/ws/options-streams/README.md
+- WebSocket Streams Guide: https://binance-docs.github.io/apidocs/voptions/en/#websocket-streams
+

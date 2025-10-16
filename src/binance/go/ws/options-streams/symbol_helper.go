@@ -193,7 +193,7 @@ func selectATMSymbol(underlying string, optionType string) (string, error) {
 			if err != nil {
 				continue
 			}
-			
+
 			// Calculate absolute difference from current price
 			difference := abs(strikePrice - currentPrice)
 			if difference < minDifference {

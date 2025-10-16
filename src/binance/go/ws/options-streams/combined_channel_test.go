@@ -41,7 +41,6 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
 	}
-	defer stc.Disconnect()
 
 	// Log current active server from SDK defaults
 	if as := stc.client.GetActiveServer(); as != nil {
