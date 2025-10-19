@@ -6,7 +6,7 @@ This directory contains comprehensive integration tests for the Binance USD-M Fu
 
 - **SDK Location**: `../binance-go/ws/umfutures-streams`  
 - **Test Suite**: Comprehensive integration tests covering all stream types and functionality
-- **Server**: Uses Binance Testnet by default (`wss://fstream.binancefuture.com/ws`)
+- **Server**: Uses Binance Testnet server `testnet1` by default
 - **Coverage**: 100% of available stream types and connection methods
 
 ## Stream Types Tested
@@ -80,6 +80,9 @@ go test -v -run TestDifferentDepthLevels
 # Combined streams
 go test -v -run TestCombinedStream
 
+# User data streams (requires testnet API keys)
+go test -v -run TestFullIntegrationSuite_UserData
+
 # Error handling
 go test -v -run TestError
 
@@ -115,6 +118,15 @@ cp env.example env.local
 # Source the environment
 source env.local
 ```
+
+WebSocket server selection:
+- Default: tests programmatically select the SDK server named `testnet1`.
+- Override (optional): set `BINANCE_UMFUTURES_WS_SERVER` to a full WS URL to force a custom endpoint; tests will use an internal server named `override`.
+
+REST server selection (for auxiliary symbol discovery/validation):
+- Default: SDK defaults.
+- Override (optional): set `BINANCE_UMFUTURES_REST_SERVER` to a full REST base URL.
+ - User data tests default to `https://testnet.binancefuture.com` when not overridden.
 
 ### Test Symbols
 
