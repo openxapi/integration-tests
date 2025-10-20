@@ -13,7 +13,7 @@ import (
     "github.com/openxapi/binance-go/ws/options-streams/models"
 )
 
-// TestFullIntegrationSuite_UserData runs request/response and event coverage for UserDataStreamsChannel
+// TestFullIntegrationSuite_UserData runs request/response and event coverage for UserDataStreamChannel
 func TestFullIntegrationSuite_UserData(t *testing.T) {
     if testing.Short() {
         t.Skip("Skipping in short mode")
@@ -68,7 +68,7 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
     }
 
     // User data channel
-    ud := optionsstreams.NewUserDataStreamsChannel(stc.client)
+    ud := optionsstreams.NewUserDataStreamChannel(stc.client)
 
     // Log current active server from SDK defaults
     if as := stc.client.GetActiveServer(); as != nil {

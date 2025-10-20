@@ -4,13 +4,13 @@ SDK: `github.com/openxapi/binance-go/ws/options-streams`
 REST: `github.com/openxapi/binance-go/rest/options`
 
 Notes
-- Request methods accept a third argument: pointer to per‑request callback (e.g., `*func(context.Context, *models.SubscriptionResponse) error`). Tests pass concrete callbacks and assert ids/fields.
+- Request methods accept a third argument: pointer to per‑request callback (e.g., `*func(context.Context, *models.SubscribeResponse) error`). Tests pass concrete callbacks and assert ids/fields.
 - One IntegrationTestSuite per channel: Market, Combined, User Data. Field‑level assertions are performed for each event type where market activity exists.
 
 Coverage Summary
-- MarketStreamsChannel: 100% of request methods and event handlers covered.
-- CombinedMarketStreamsChannel: 100% of request methods and event handlers (incl. wrapper) covered.
-- UserDataStreamsChannel: Connect/Disconnect and all event handlers covered (requires API keys).
+- MarketStreamChannel: 100% of request methods and event handlers covered.
+- CombinedMarketStreamChannel: 100% of request methods and event handlers (incl. wrapper) covered.
+- UserDataStreamChannel: Connect/Disconnect and all event handlers covered (requires API keys).
 - Stream builders and typed params: covered for all stream types used in tests.
 - Core Client / Server management / WS Auth: pending (relied on SDK defaults in tests).
 
@@ -78,15 +78,15 @@ Stream Builders & Typed Params (package functions/types)
 - [x] PartialDepthEventStreamParams.Values()
 - [x] OpenInterestEventStreamParams.Values()
 
-Market Streams (type `MarketStreamsChannel`, key: `marketStreams`)
-- [x] NewMarketStreamsChannel(client *Client) *MarketStreamsChannel
+Market Streams (type `MarketStreamChannel`, key: `marketStream`)
+- [x] NewMarketStreamChannel(client *Client) *MarketStreamChannel
 - [x] Connect(ctx context.Context, streamName string) error
 - [x] Disconnect(ctx context.Context) error
-- [x] SubscribeToMarketStreams(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscriptionResponse) error) error
-- [x] UnsubscribeFromMarketStreams(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscriptionResponse) error) error
-- [x] ListSubscriptionsFromMarketStreams(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
-- [x] SetPropertyOnMarketStreams(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
-- [x] GetPropertyFromMarketStreams(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
+- [x] Subscribe(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscribeResponse) error) error
+- [x] Unsubscribe(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscribeResponse) error) error
+- [x] ListSubscriptions(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
+- [x] SetProperty(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
+- [x] GetProperty(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
 - [x] HandleNewSymbolInfoEvent(fn func(context.Context, *models.NewSymbolInfoEvent) error)
 - [x] HandleOpenInterestEvent(fn func(context.Context, *models.OpenInterestEvent) error)
 - [x] HandleMarkPriceEvent(fn func(context.Context, *models.MarkPriceEvent) error)
@@ -98,16 +98,16 @@ Market Streams (type `MarketStreamsChannel`, key: `marketStreams`)
 - [x] HandlePartialDepthEvent(fn func(context.Context, *models.PartialDepthEvent) error)
 - [x] HandleErrorMessage(fn func(context.Context, *models.ErrorMessage) error)
 
-Combined Market Streams (type `CombinedMarketStreamsChannel`, key: `combinedMarketStreams`)
-- [x] NewCombinedMarketStreamsChannel(client *Client) *CombinedMarketStreamsChannel
+Combined Market Streams (type `CombinedMarketStreamChannel`, key: `combinedMarketStream`)
+- [x] NewCombinedMarketStreamChannel(client *Client) *CombinedMarketStreamChannel
 - [x] Connect(ctx context.Context, streams string) error
 - [x] Disconnect(ctx context.Context) error
-- [x] SubscribeToCombinedMarketStreams(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscriptionResponse) error) error
-- [x] UnsubscribeFromCombinedMarketStreams(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscriptionResponse) error) error
-- [x] ListSubscriptionsFromCombinedMarketStreams(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
-- [x] SetPropertyOnCombinedMarketStreams(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
-- [x] GetPropertyFromCombinedMarketStreams(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
-- [x] HandleCombinedStreamData(fn func(context.Context, *models.CombinedMarketStreamsEvent) error)
+- [x] Subscribe(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscribeResponse) error) error
+- [x] Unsubscribe(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscribeResponse) error) error
+- [x] ListSubscriptions(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
+- [x] SetProperty(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
+- [x] GetProperty(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
+- [x] HandleCombinedMarketStreamEvent(fn func(context.Context, *models.CombinedMarketStreamEvent) error)
 - [x] HandleErrorMessage(fn func(context.Context, *models.ErrorMessage) error)
 - [x] HandleNewSymbolInfoEvent(fn func(context.Context, *models.NewSymbolInfoEvent) error)
 - [x] HandleOpenInterestEvent(fn func(context.Context, *models.OpenInterestEvent) error)
@@ -119,8 +119,8 @@ Combined Market Streams (type `CombinedMarketStreamsChannel`, key: `combinedMark
 - [x] HandleTradeEvent(fn func(context.Context, *models.TradeEvent) error)
 - [x] HandlePartialDepthEvent(fn func(context.Context, *models.PartialDepthEvent) error)
 
-User Data Streams (type `UserDataStreamsChannel`, key: `userDataStreams`)
-- [x] NewUserDataStreamsChannel(client *Client) *UserDataStreamsChannel
+User Data Streams (type `UserDataStreamChannel`, key: `userDataStream`)
+- [x] NewUserDataStreamChannel(client *Client) *UserDataStreamChannel
 - [x] Connect(ctx context.Context, listenKey string) error
 - [x] Disconnect(ctx context.Context) error
 - [x] HandleAccountUpdateEvent(fn func(context.Context, *models.AccountUpdateEvent) error)
@@ -141,4 +141,3 @@ Next Steps
 - Cover ServerManager helpers and URL resolution.
 - Add WS auth/signing coverage if/when private WS messages require it.
 - Expand negative/edge‑case tests (bad params, unsubscribed list checks, etc.).
-

@@ -66,9 +66,9 @@ go test -short  # skips long-running integration suites
 Core files in this module:
 - `main_test.go` – entry and printed summary, per‑suite runners.
 - `integration_test.go` – shared/dedicated client helpers and utilities.
-- `market_channel_test.go` – MarketStreamsChannel suite (requests + events).
-- `combined_channel_test.go` – CombinedMarketStreamsChannel suite (requests + events).
-- `user_data_channel_test.go` – UserDataStreamsChannel suite (events; needs keys).
+- `market_channel_test.go` – MarketStreamChannel suite (requests + events).
+- `combined_channel_test.go` – CombinedMarketStreamChannel suite (requests + events).
+- `user_data_channel_test.go` – UserDataStreamChannel suite (events; needs keys).
 - Helpers: `assert_helpers_test.go`, `log_helpers_test.go`, `rest_helpers_test.go`, `symbol_helper.go`, `test_timing_helpers_test.go`.
 
 Architecture highlights:
@@ -110,4 +110,3 @@ See `API_COVERAGE.md` for a checklist of covered exported methods and next steps
 - Binance Options API: https://binance-docs.github.io/apidocs/voptions/en/
 - SDK WS README: ../../../../../../binance-go/ws/options-streams/README.md
 - WebSocket Streams Guide: https://binance-docs.github.io/apidocs/voptions/en/#websocket-streams
-

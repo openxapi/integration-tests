@@ -125,8 +125,8 @@ func getTestConfigs() []TestConfig {
 
 // StreamTestClient wraps the options-streams client for testing
 type StreamTestClient struct {
-	client *optionsstreams.Client
-	config TestConfig
+    client *optionsstreams.Client
+    config TestConfig
 
 	// Event tracking
 	eventsReceived []interface{}
@@ -140,9 +140,9 @@ type StreamTestClient struct {
 	connected bool
 	mu        sync.RWMutex
 
-	// SDK channels
-	combinedCh *optionsstreams.CombinedMarketStreamsChannel
-	marketCh   *optionsstreams.MarketStreamsChannel
+    // SDK channels
+    combinedCh *optionsstreams.CombinedMarketStreamChannel
+    marketCh   *optionsstreams.MarketStreamChannel
 }
 
 // NewStreamTestClient creates a new test client for Options streams using shared client
@@ -152,14 +152,14 @@ func NewStreamTestClient(t *testing.T, config TestConfig) (*StreamTestClient, er
 		return nil, fmt.Errorf("failed to get shared client for config %s", config.Name)
 	}
 
-	return &StreamTestClient{
-		client:         client,
-		config:         config,
-		eventsReceived: make([]interface{}, 0),
-		activeStreams:  make([]string, 0),
-		combinedCh:     optionsstreams.NewCombinedMarketStreamsChannel(client),
-		marketCh:       optionsstreams.NewMarketStreamsChannel(client),
-	}, nil
+    return &StreamTestClient{
+        client:         client,
+        config:         config,
+        eventsReceived: make([]interface{}, 0),
+        activeStreams:  make([]string, 0),
+        combinedCh:     optionsstreams.NewCombinedMarketStreamChannel(client),
+        marketCh:       optionsstreams.NewMarketStreamChannel(client),
+    }, nil
 }
 
 // NewStreamTestClientDedicated creates a dedicated (non-shared) test client for specific use cases

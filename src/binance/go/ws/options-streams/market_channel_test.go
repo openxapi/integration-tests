@@ -30,7 +30,7 @@ func (w *unhandledCatcher) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// TestFullIntegrationSuite_Market runs request/response and event coverage for MarketStreamsChannel
+// TestFullIntegrationSuite_Market runs request/response and event coverage for MarketStreamChannel
 func TestFullIntegrationSuite_Market(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping in short mode")
@@ -77,8 +77,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 	underlyingLower := low
 	t.Logf("Using underlying from REST: upper=%s lower=%s", underlyingUpper, underlyingLower)
 
-	// Prepare a channel instance and connect once for the entire suite
-	market := optionsstreams.NewMarketStreamsChannel(stc.client)
+    // Prepare a channel instance and connect once for the entire suite
+    market := optionsstreams.NewMarketStreamChannel(stc.client)
 	// Record events from the start of the suite
 	rec := newMarketEventRecorder()
 	market.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { logJSON(t, "ws.error", msg); return nil })
@@ -130,8 +130,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		// Use SUBSCRIBE on the existing connection; validate exact response id
 		sid := time.Now().UnixMicro()
 		subDone := make(chan struct{}, 1)
-		var gotSub *models.SubscriptionResponse
-		subCb := func(ctx context.Context, resp *models.SubscriptionResponse) error {
+        var gotSub *models.SubscribeResponse
+        subCb := func(ctx context.Context, resp *models.SubscribeResponse) error {
 			if resp == nil {
 				t.Errorf("nil subscribe response")
 				return nil
@@ -148,9 +148,9 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			return nil
 		}
 		req := &models.SubscribeRequest{Id: sid, Params: []string{markPath, indexPath}}
-		if err := market.SubscribeToMarketStreams(context.Background(), req, &subCb); err != nil {
-			t.Fatalf("subscribe call failed: %v", err)
-		}
+        if err := market.Subscribe(context.Background(), req, &subCb); err != nil {
+            t.Fatalf("subscribe call failed: %v", err)
+        }
 		t.Logf("subscribe request sent (id=%d) for %s and %s", sid, markPath, indexPath)
 		select {
 		case <-subDone:
@@ -161,8 +161,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("did not capture subscribe response")
 		}
 		// Proactively unsubscribe to avoid cross-test event spam from active streams
-		var unsubCb func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{markPath, indexPath}}, &unsubCb)
+        var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{markPath, indexPath}}, &unsubCb)
 	})
 
 	t.Run("Request_ListSubscriptions", func(t *testing.T) {
@@ -172,10 +172,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build index stream: %v", err)
 		}
 		// Subscribe to receive index events
-		subCb0 := func(context.Context, *models.SubscriptionResponse) error { return nil }
-		if err := market.SubscribeToMarketStreams(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &subCb0); err != nil {
-			t.Fatalf("subscribe before list failed: %v", err)
-		}
+        subCb0 := func(context.Context, *models.SubscribeResponse) error { return nil }
+        if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &subCb0); err != nil {
+            t.Fatalf("subscribe before list failed: %v", err)
+        }
 		lid := time.Now().UnixMicro()
 		listDone := make(chan struct{}, 1)
 		var gotList *models.ListSubscriptionsResponse
@@ -198,9 +198,9 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			}
 			return nil
 		}
-		if err := market.ListSubscriptionsFromMarketStreams(context.Background(), &models.ListSubscriptionsRequest{Id: lid}, &lsCb); err != nil {
-			t.Fatalf("list subscriptions call failed: %v", err)
-		}
+        if err := market.ListSubscriptions(context.Background(), &models.ListSubscriptionsRequest{Id: lid}, &lsCb); err != nil {
+            t.Fatalf("list subscriptions call failed: %v", err)
+        }
 		t.Logf("listSubscriptions request sent (id=%d)", lid)
 		select {
 		case <-listDone:
@@ -211,8 +211,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("did not capture listSubscriptions response")
 		}
 		// Cleanup
-		unsubCb0 := func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &unsubCb0)
+        unsubCb0 := func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &unsubCb0)
 	})
 
 	t.Run("Request_SetProperty", func(t *testing.T) {
@@ -224,8 +224,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		// Already connected at top-level; global handlers record events
 		// Subscribe to receive index events
-		var subBeforeGet func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
-		_ = market.SubscribeToMarketStreams(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &subBeforeGet)
+        var subBeforeGet func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &subBeforeGet)
 		pid := time.Now().UnixMicro()
 		setDone := make(chan struct{}, 1)
 		var gotSet *models.SetPropertyResponse
@@ -248,7 +248,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		// Use a short timeout; some endpoints may not ACK this on single-stream connections
 		spCtx, spCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer spCancel()
-		if err := market.SetPropertyOnMarketStreams(spCtx, &models.SetPropertyRequest{Id: pid, Params: []interface{}{"combined", false}}, &setCb); err != nil {
+        if err := market.SetProperty(spCtx, &models.SetPropertyRequest{Id: pid, Params: []interface{}{"combined", false}}, &setCb); err != nil {
 			// Treat context timeout as acceptable behavior
 			le := strings.ToLower(err.Error())
 			if strings.Contains(le, "context deadline") || strings.Contains(le, "deadline exceeded") {
@@ -277,8 +277,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		// Already connected at top-level; global handlers record events
 		// Subscribe to receive index events so optional validation can succeed and avoid unused var
-		var preGetSubCb func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
-		_ = market.SubscribeToMarketStreams(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &preGetSubCb)
+        var preGetSubCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{indexPath}}, &preGetSubCb)
 		gid := time.Now().UnixMicro()
 		getDone := make(chan struct{}, 1)
 		var gotGet *models.GetPropertyResponse
@@ -300,7 +300,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		gCtx, gCancel := context.WithTimeout(context.Background(), 8*time.Second)
 		defer gCancel()
-		if err := market.GetPropertyFromMarketStreams(gCtx, &models.GetPropertyRequest{Id: gid, Params: []string{"combined"}}, &getCb); err != nil {
+        if err := market.GetProperty(gCtx, &models.GetPropertyRequest{Id: gid, Params: []string{"combined"}}, &getCb); err != nil {
 			le := strings.ToLower(err.Error())
 			if strings.Contains(le, "context deadline") || strings.Contains(le, "deadline exceeded") {
 				t.Logf("getProperty returned timeout (acceptable): %v", err)
@@ -330,8 +330,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		// Subscribe and wait for ACK to avoid racing UNSUBSCRIBE before server processes SUBSCRIBE
 		sid := time.Now().UnixMicro()
 		subDone := make(chan struct{}, 1)
-		var gotSub *models.SubscriptionResponse
-		subCb := func(ctx context.Context, resp *models.SubscriptionResponse) error {
+        var gotSub *models.SubscribeResponse
+        subCb := func(ctx context.Context, resp *models.SubscribeResponse) error {
 			if resp == nil {
 				t.Errorf("nil subscribe response")
 				return nil
@@ -347,7 +347,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			}
 			return nil
 		}
-		if err := market.SubscribeToMarketStreams(context.Background(), &models.SubscribeRequest{Id: sid, Params: []string{markPath}}, &subCb); err != nil {
+        if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: sid, Params: []string{markPath}}, &subCb); err != nil {
 			t.Fatalf("subscribe before unsubscribe failed: %v", err)
 		}
 		// Wait a short window for subscribe ACK; if it doesn't arrive we continue but may see no UNSUB ACK
@@ -359,7 +359,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		_ = gotSub
 		uid := time.Now().UnixMicro()
 		unsubDone := make(chan struct{}, 1)
-		unsubCb := func(ctx context.Context, resp *models.UnsubscriptionResponse) error {
+        unsubCb := func(ctx context.Context, resp *models.UnsubscribeResponse) error {
 			if resp == nil {
 				t.Errorf("nil unsubscribe response")
 				return nil
@@ -374,7 +374,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			}
 			return nil
 		}
-		if err := market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: uid, Params: []string{markPath}}, &unsubCb); err != nil {
+        if err := market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: uid, Params: []string{markPath}}, &unsubCb); err != nil {
 			t.Fatalf("unsubscribe call failed: %v", err)
 		}
 		t.Logf("unsubscribe request sent (id=%d) for %s", uid, markPath)
@@ -398,7 +398,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 				}
 				return nil
 			}
-			_ = market.ListSubscriptionsFromMarketStreams(context.Background(), &models.ListSubscriptionsRequest{Id: lid}, &lsCb)
+            _ = market.ListSubscriptions(context.Background(), &models.ListSubscriptionsRequest{Id: lid}, &lsCb)
 			select {
 			case <-lsDone:
 				if contains(listed, markPath) {
@@ -421,10 +421,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build index stream: %v", err)
 		}
 		// Subscribe on the existing connection (global handlers will record events)
-		var subCb0 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
+        var subCb0 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		req0 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req0)
-		_ = market.SubscribeToMarketStreams(context.Background(), req0, &subCb0)
+        _ = market.Subscribe(context.Background(), req0, &subCb0)
 		_ = rec.waitForMin("index", 1, eventWait())
 		if evs := rec.getIndex(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -460,10 +460,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build markPrice stream: %v", err)
 		}
 		// Already connected at top-level; global handlers will record events
-		var subCb1 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
+        var subCb1 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		req1 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req1)
-		_ = market.SubscribeToMarketStreams(context.Background(), req1, &subCb1)
+        _ = market.Subscribe(context.Background(), req1, &subCb1)
 		_ = rec.waitForMin("markPrice", 1, eventWait())
 		if evs := rec.getMark(); len(evs) > 0 && evs[len(evs)-1] != nil {
 			ev := evs[len(evs)-1]
@@ -496,8 +496,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("MarkPriceEvent count: %d", rec.count("markPrice"))
 		// Unsubscribe from markPrice stream
-		var unsubCbMk func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbMk)
+        var unsubCbMk func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbMk)
 	})
 
 	t.Run("KlineEvent", func(t *testing.T) {
@@ -516,10 +516,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build kline stream: %v", err)
 		}
 		// Subscribe on the existing connection (global handlers will record events)
-		var subCb2 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
+        var subCb2 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		req2 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req2)
-		_ = market.SubscribeToMarketStreams(context.Background(), req2, &subCb2)
+        _ = market.Subscribe(context.Background(), req2, &subCb2)
 		_ = rec.waitForMin("kline", 1, eventWaitLong())
 		if evs := rec.getKline(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -541,8 +541,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("KlineEvent count: %d", rec.count("kline"))
 		// Unsubscribe from kline stream
-		var unsubCbKl func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbKl)
+        var unsubCbKl func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbKl)
 	})
 
 	t.Run("TickerEvent", func(t *testing.T) {
@@ -557,10 +557,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build ticker stream: %v", err)
 		}
 		// Subscribe on the existing connection (global handlers will record events)
-		var subCb3 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
+        var subCb3 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		req3 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req3)
-		_ = market.SubscribeToMarketStreams(context.Background(), req3, &subCb3)
+        _ = market.Subscribe(context.Background(), req3, &subCb3)
 		_ = rec.waitForMin("ticker", 1, eventWait())
 		if evs := rec.getTicker(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -587,8 +587,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("TickerEvent count: %d", rec.count("ticker"))
 		// Unsubscribe from ticker stream
-		var unsubCbTk func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbTk)
+        var unsubCbTk func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbTk)
 	})
 
 	t.Run("TickerByUnderlyingEvent", func(t *testing.T) {
@@ -603,10 +603,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build ticker-by-underlying stream: %v", err)
 		}
 		// Subscribe on the existing connection (global handlers will record events)
-		var subCb6 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
+        var subCb6 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		req6 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req6)
-		_ = market.SubscribeToMarketStreams(context.Background(), req6, &subCb6)
+        _ = market.Subscribe(context.Background(), req6, &subCb6)
 		_ = rec.waitForMin("tickerByUnderlying", 1, eventWait())
 		if evs := rec.getTickerByUnderlying(); len(evs) > 0 && evs[len(evs)-1] != nil {
 			ev := evs[len(evs)-1]
@@ -630,8 +630,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("TickerByUnderlyingEvent count: %d", rec.count("tickerByUnderlying"))
 		// Unsubscribe from ticker-by-underlying stream
-		var unsubCbTbu func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbTbu)
+        var unsubCbTbu func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbTbu)
 	})
 
 	t.Run("IndexPriceEvent_Again", func(t *testing.T) {
@@ -651,10 +651,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build trade stream: %v", err)
 		}
 		// Subscribe on the existing connection (global handlers will record events)
-		var subCb7 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
+        var subCb7 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		req7 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req7)
-		_ = market.SubscribeToMarketStreams(context.Background(), req7, &subCb7)
+        _ = market.Subscribe(context.Background(), req7, &subCb7)
 		_ = rec.waitForMin("trade", 1, eventWaitLong())
 		if evs := rec.getTrade(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -676,8 +676,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("TradeEvent count: %d", rec.count("trade"))
 		// Unsubscribe from trade stream
-		var unsubCbTr func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbTr)
+        var unsubCbTr func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbTr)
 	})
 
 	t.Run("PartialDepthEvent", func(t *testing.T) {
@@ -692,10 +692,10 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build partialDepth stream: %v", err)
 		}
 		// Subscribe on the existing connection (global handlers will record events)
-		var subCb8 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
+        var subCb8 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		req8 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req8)
-		_ = market.SubscribeToMarketStreams(context.Background(), req8, &subCb8)
+        _ = market.Subscribe(context.Background(), req8, &subCb8)
 		_ = rec.waitForMin("partialDepth", 1, eventWaitLong())
 		if evs := rec.getPartialDepth(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -726,8 +726,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("PartialDepthEvent count: %d", rec.count("partialDepth"))
 		// Unsubscribe from partial depth stream
-		var unsubCbPd func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbPd)
+        var unsubCbPd func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbPd)
 	})
 
 	t.Run("NewSymbolInfoEvent", func(t *testing.T) {
@@ -740,8 +740,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		req4 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}
 		logJSON(t, "request.subscribe", req4)
 		// Register a no-op ack handler to ensure SDK dispatch marks message as handled
-		var subCb4 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
-		_ = market.SubscribeToMarketStreams(context.Background(), req4, &subCb4)
+        var subCb4 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+        _ = market.Subscribe(context.Background(), req4, &subCb4)
 		_ = rec.waitForMin("newSymbolInfo", 1, eventWait())
 		if evs := rec.getNewSymbolInfo(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -770,8 +770,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("NewSymbolInfoEvent count: %d", rec.count("newSymbolInfo"))
 		// Unsubscribe from newSymbolInfo stream
-		var unsubCbNs func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCbNs)
+        var unsubCbNs func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCbNs)
 	})
 
 	t.Run("OpenInterestEvent", func(t *testing.T) {
@@ -789,8 +789,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		req5 := &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}
 		logJSON(t, "request.subscribe", req5)
 		// Register a no-op ack handler to ensure SDK dispatch marks message as handled
-		var subCb5 func(context.Context, *models.SubscriptionResponse) error = func(context.Context, *models.SubscriptionResponse) error { return nil }
-		_ = market.SubscribeToMarketStreams(context.Background(), req5, &subCb5)
+        var subCb5 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+        _ = market.Subscribe(context.Background(), req5, &subCb5)
 		_ = rec.waitForMin("openInterest", 1, eventWaitLong())
 		if evs := rec.getOpenInterest(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -811,8 +811,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		t.Logf("OpenInterestEvent count: %d", rec.count("openInterest"))
 		// Unsubscribe from openInterest stream
-		var unsubCbOi func(context.Context, *models.UnsubscriptionResponse) error = func(context.Context, *models.UnsubscriptionResponse) error { return nil }
-		_ = market.UnsubscribeFromMarketStreams(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbOi)
+        var unsubCbOi func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsubCbOi)
 	})
 }
 
