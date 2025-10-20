@@ -31,21 +31,21 @@ Stream Builders & Typed Params (subset used by tests)
 Market Streams (type `MarketStreamsChannel`, key: `marketStreams`)
 - [x] NewMarketStreamsChannel(client *Client) *MarketStreamsChannel
 - [x] Connect(ctx, streamName string) / Disconnect(ctx)
-- [x] MarketStreamsSubscribe(ctx, req, cb)
-- [x] MarketStreamsUnsubscribe(ctx, req, cb)
-- [x] MarketStreamsListSubscriptions(ctx, req, cb)
-- [x] MarketStreamsSetProperty(ctx, req, cb) (timeout tolerated)
-- [x] MarketStreamsGetProperty(ctx, req, cb) (optional ACK)
+- [x] Subscribe(ctx, req, cb)
+- [x] Unsubscribe(ctx, req, cb)
+- [x] ListSubscriptions(ctx, req, cb)
+- [x] SetProperty(ctx, req, cb) (timeout tolerated)
+- [x] GetProperty(ctx, req, cb) (optional ACK)
 - [x] HandleAggregateTradeEvent / HandleMarkPriceEvent / HandleKlineEvent / HandleTickerEvent / HandleBookTickerEvent / HandlePartialDepthEvent / HandleDiffDepthEvent / HandleErrorMessage
 
 Combined Market Streams (type `CombinedMarketStreamsChannel`, key: `combinedMarketStreams`)
 - [x] NewCombinedMarketStreamsChannel(client *Client) *CombinedMarketStreamsChannel
 - [x] Connect(ctx, streams string) / Disconnect(ctx)
-- [x] CombinedMarketStreamsSubscribe(ctx, req, cb)
-- [x] CombinedMarketStreamsUnsubscribe(ctx, req, cb)
-- [x] CombinedMarketStreamsListSubscriptions(ctx, req, cb)
-- [x] CombinedMarketStreamsSetProperty(ctx, req, cb) (timeout tolerated)
-- [x] CombinedMarketStreamsGetProperty(ctx, req, cb) (optional ACK)
+- [x] Subscribe(ctx, req, cb)
+- [x] Unsubscribe(ctx, req, cb)
+- [x] ListSubscriptions(ctx, req, cb)
+- [x] SetProperty(ctx, req, cb) (timeout tolerated)
+- [x] GetProperty(ctx, req, cb) (optional ACK)
 - Handlers (Complete List):
   - [x] HandleCombinedMarketStreamsEvent (wrapper)
   - [x] HandleErrorMessage

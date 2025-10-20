@@ -3,8 +3,11 @@ package streamstest
 import (
     "bytes"
     "context"
+    "encoding/json"
+    "fmt"
     "io"
     "log"
+    "math"
     "os"
     "strconv"
     "strings"
@@ -148,24 +151,240 @@ func keepaliveListenKeyTestnet(t *testing.T, lk string) {
     _, _, _ = rc.FuturesAPI.UpdateListenKeyV1(ctx).Execute()
 }
 
-// placeTestLimitOrder places a small limit order to trigger ORDER_TRADE_UPDATE events
-func placeTestLimitOrder(t *testing.T, symbol string, side string, qty string, price float64) error {
+// placeTestMarketOrder places a small market order to try to trigger TRADE_LITE and ACCOUNT_UPDATE
+func placeTestMarketOrder(t *testing.T, symbol string, side string, qty string) error {
     t.Helper()
     rc := newRESTClientUserData()
     ctx, err := restAuthContextUser()
     if err != nil { return err }
     ts := time.Now().UnixMilli()
-    prStr := strconv.FormatFloat(price, 'f', -1, 64)
+    req := rc.FuturesAPI.CreateOrderV1(ctx).
+        Symbol(symbol).
+        Side(side).
+        Type_("MARKET").
+        Quantity(qty).
+        Timestamp(ts)
+    _, _, err = req.Execute()
+    if err == nil { return nil }
+    if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+        var em struct{ Code int `json:"code"`; Msg string `json:"msg"` }
+        if len(ge.Body()) > 0 {
+            if e2 := json.Unmarshal(ge.Body(), &em); e2 == nil && (em.Code != 0 || em.Msg != "") {
+                return fmt.Errorf("market order rejected: status=%s code=%d msg=%s body=%s", ge.Error(), em.Code, em.Msg, string(ge.Body()))
+            }
+            return fmt.Errorf("market order rejected: status=%s body=%s", ge.Error(), string(ge.Body()))
+        }
+        return fmt.Errorf("market order rejected: status=%s", ge.Error())
+    }
+    return err
+}
+
+// cancelAllOpenOrders cancels all open orders across all symbols to allow position mode toggling
+func cancelAllOpenOrders(t *testing.T) {
+    t.Helper()
+    rc := newRESTClientUserData()
+    ctx, err := restAuthContextUser()
+    if err != nil { t.Logf("cancelAllOpenOrders: no auth: %v", err); return }
+    ts := time.Now().UnixMilli()
+    orders, _, err := rc.FuturesAPI.GetOpenOrdersV1(ctx).Timestamp(ts).RecvWindow(5000).Execute()
+    if err != nil {
+        if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+            t.Logf("cancelAllOpenOrders: get open orders failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+        } else {
+            t.Logf("cancelAllOpenOrders: get open orders failed: %v", err)
+        }
+        return
+    }
+    if len(orders) == 0 { t.Logf("cancelAllOpenOrders: no open orders") ; return }
+    // collect unique symbols
+    syms := make(map[string]struct{})
+    for _, o := range orders {
+        if o.Symbol != nil && *o.Symbol != "" { syms[*o.Symbol] = struct{}{} }
+    }
+    t.Logf("cancelAllOpenOrders: symbols with open orders: %v", keysOf(syms))
+    // cancel per symbol
+    for sym := range syms {
+        ts2 := time.Now().UnixMilli()
+        _, _, err := rc.FuturesAPI.DeleteAllOpenOrdersV1(ctx).Symbol(sym).Timestamp(ts2).RecvWindow(5000).Execute()
+        if err != nil {
+            if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+                t.Logf("cancelAllOpenOrders: cancel symbol=%s failed: status=%s body=%s", sym, ge.Error(), string(ge.Body()))
+            } else {
+                t.Logf("cancelAllOpenOrders: cancel symbol=%s failed: %v", sym, err)
+            }
+        } else {
+            t.Logf("cancelAllOpenOrders: canceled all open orders for %s", sym)
+        }
+    }
+}
+
+func keysOf(m map[string]struct{}) []string {
+    ks := make([]string, 0, len(m))
+    for k := range m { ks = append(ks, k) }
+    return ks
+}
+
+// placeTestLimitOrder places a small limit order to trigger ORDER_TRADE_UPDATE events
+func placeTestLimitOrder(t *testing.T, symbol string, side string, qty string, priceStr string) error {
+    t.Helper()
+    rc := newRESTClientUserData()
+    ctx, err := restAuthContextUser()
+    if err != nil { return err }
+    ts := time.Now().UnixMilli()
     req := rc.FuturesAPI.CreateOrderV1(ctx).
         Symbol(symbol).
         Side(side).
         Type_("LIMIT").
         TimeInForce("GTC").
         Quantity(qty).
-        Price(prStr).
+        Price(priceStr).
         Timestamp(ts)
     _, _, err = req.Execute()
+    if err == nil { return nil }
+    // Decode REST error body (if available) to bubble up Binance error code/message for clarity
+    if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+        var em struct{ Code int `json:"code"`; Msg string `json:"msg"` }
+        // always include raw body in error for debugging
+        if len(ge.Body()) > 0 {
+            if e2 := json.Unmarshal(ge.Body(), &em); e2 == nil && (em.Code != 0 || em.Msg != "") {
+                return fmt.Errorf("order rejected: status=%s code=%d msg=%s body=%s", ge.Error(), em.Code, em.Msg, string(ge.Body()))
+            }
+            return fmt.Errorf("order rejected: status=%s body=%s", ge.Error(), string(ge.Body()))
+        }
+        return fmt.Errorf("order rejected: status=%s", ge.Error())
+    }
     return err
+}
+
+// roundToPrec rounds x to the given decimal precision using floor for safety
+func roundToPrec(x float64, prec int) float64 {
+    if prec < 0 { prec = 0 }
+    p := math.Pow10(prec)
+    return math.Floor(x*p) / p
+}
+
+// calcLimitOrderParams derives a safe quantity and price using exchange info precisions and notional floor
+func calcLimitOrderParams(ctx context.Context, rc *restum.APIClient, symbol string, targetPrice float64) (qtyStr, priceStr string, err error) {
+    info, _, e := rc.FuturesAPI.GetExchangeInfoV1(ctx).Execute()
+    if e != nil || info == nil || info.Symbols == nil { return "", "", fmt.Errorf("exchangeInfo error: %v", e) }
+    var qp, pp int32 = 3, 2
+    // Optional: pull tick/step sizes from filters to avoid -4014 (tick size) rejections
+    var (
+        priceStep float64
+        qtyStep   float64
+        minQty    float64
+        priceDecs int
+        qtyDecs   int
+    )
+    // helpers for robust rounding to step using integer math at given scale
+    floorToStep := func(value float64, step float64, decs int) float64 {
+        if step <= 0 { // fallback to precision-based floored rounding
+            p := math.Pow10(decs)
+            return math.Floor(value*p) / p
+        }
+        scale := math.Pow10(decs)
+        // convert to integer units
+        vUnits := math.Floor(value*scale + 1e-9)
+        sUnits := math.Round(step * scale)
+        if sUnits <= 0 { sUnits = 1 }
+        q := math.Floor(vUnits/sUnits) * sUnits
+        return q / scale
+    }
+    ceilToStep := func(value float64, step float64, decs int) float64 {
+        if step <= 0 {
+            p := math.Pow10(decs)
+            return math.Ceil(value*p) / p
+        }
+        scale := math.Pow10(decs)
+        vUnits := math.Ceil(value*scale - 1e-9)
+        sUnits := math.Round(step * scale)
+        if sUnits <= 0 { sUnits = 1 }
+        q := (math.Ceil(vUnits/sUnits)) * sUnits
+        return q / scale
+    }
+    decsFromStepStr := func(s string) int {
+        if s == "" { return 0 }
+        if i := strings.IndexByte(s, '.'); i >= 0 {
+            return len(s) - i - 1
+        }
+        return 0
+    }
+    parseFloatSafe := func(s string) float64 {
+        if s == "" { return 0 }
+        if v, err := strconv.ParseFloat(s, 64); err == nil { return v }
+        return 0
+    }
+    for _, s := range info.Symbols {
+        if s.Symbol != nil && strings.EqualFold(*s.Symbol, symbol) {
+            if s.QuantityPrecision != nil { qp = *s.QuantityPrecision }
+            if s.PricePrecision != nil { pp = *s.PricePrecision }
+            // Try to derive tick/step from filters by re-marshaling to generic map
+            if b, err := json.Marshal(s); err == nil {
+                var sm map[string]any
+                if json.Unmarshal(b, &sm) == nil {
+                    if fs, ok := sm["filters"].([]any); ok {
+                        for _, f := range fs {
+                            fm, _ := f.(map[string]any)
+                            ft, _ := fm["filterType"].(string)
+                            switch strings.ToUpper(ft) {
+                            case "PRICE_FILTER":
+                                if ts, _ := fm["tickSize"].(string); ts != "" {
+                                    priceStep = parseFloatSafe(ts)
+                                    priceDecs = decsFromStepStr(ts)
+                                }
+                            case "LOT_SIZE":
+                                if ss, _ := fm["stepSize"].(string); ss != "" {
+                                    qtyStep = parseFloatSafe(ss)
+                                    qtyDecs = decsFromStepStr(ss)
+                                }
+                                if mq, _ := fm["minQty"].(string); mq != "" {
+                                    minQty = parseFloatSafe(mq)
+                                }
+                            case "MARKET_LOT_SIZE":
+                                // fallback step for quantity if LOT_SIZE absent
+                                if qtyStep == 0 {
+                                    if ss, _ := fm["stepSize"].(string); ss != "" {
+                                        qtyStep = parseFloatSafe(ss)
+                                        qtyDecs = decsFromStepStr(ss)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            break
+        }
+    }
+    // Decide decimals to print: prefer from step strings; fallback to precision fields
+    if priceDecs == 0 { priceDecs = int(pp) }
+    if qtyDecs == 0 { qtyDecs = int(qp) }
+    // Use a price slightly below mark and round DOWN to the nearest valid tick step
+    price := floorToStep(targetPrice, priceStep, priceDecs)
+    if price <= 0 { return "", "", fmt.Errorf("invalid rounded price") }
+    // Ensure notional >= ~5 USDT while using quantity step and minQty
+    minNotional := 5.0
+    needQty := minNotional / price
+    q := needQty
+    // honor minQty if present
+    if minQty > 0 && q < minQty { q = minQty }
+    // ceil to the next quantity step
+    q = ceilToStep(q, qtyStep, qtyDecs)
+    // cap quantity to keep notional modest (avoid margin issues)
+    maxNotional := 20.0
+    if q*price > maxNotional {
+        // floor to step after capping target notional
+        target := maxNotional / price
+        q = floorToStep(target, qtyStep, qtyDecs)
+        if q <= 0 {
+            // fallback to the minimal step unit by decimals
+            q = 1.0 / math.Pow10(qtyDecs)
+        }
+    }
+    // Final formatting
+    qtyStr = fmt.Sprintf("%.*f", qtyDecs, q)
+    priceStr = fmt.Sprintf("%.*f", priceDecs, price)
+    return qtyStr, priceStr, nil
 }
 
 // togglePositionMode flips dual-side position to trigger ACCOUNT_CONFIG_UPDATE
@@ -176,17 +395,30 @@ func togglePositionMode(t *testing.T) error {
     if err != nil { return err }
     ts := time.Now().UnixMilli()
     // Get current mode
-    cur, _, err := rc.FuturesAPI.GetPositionSideDualV1(ctx).Timestamp(ts).Execute()
-    if err != nil || cur == nil || cur.DualSidePosition == nil { return err }
+    cur, _, err := rc.FuturesAPI.GetPositionSideDualV1(ctx).Timestamp(ts).RecvWindow(5000).Execute()
+    if err != nil {
+        if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+            return fmt.Errorf("get position mode failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+        }
+        return err
+    }
+    if cur == nil || cur.DualSidePosition == nil { return fmt.Errorf("get position mode returned empty response") }
     // Flip value
     newVal := "false"
     if *cur.DualSidePosition == true { newVal = "false" } else { newVal = "true" }
+    t.Logf("toggle position mode: current_dual=%v -> target_dual=%s", *cur.DualSidePosition, newVal)
     ts2 := time.Now().UnixMilli()
-    _, _, err = rc.FuturesAPI.CreatePositionSideDualV1(ctx).DualSidePosition(newVal).Timestamp(ts2).Execute()
-    return err
+    _, _, err = rc.FuturesAPI.CreatePositionSideDualV1(ctx).DualSidePosition(newVal).Timestamp(ts2).RecvWindow(5000).Execute()
+    if err != nil {
+        if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+            return fmt.Errorf("set position mode failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+        }
+        return err
+    }
+    return nil
 }
 
-// TestFullIntegrationSuite_UserData runs request/response and event coverage for UserDataStreamsChannel
+// TestFullIntegrationSuite_UserData runs request/response and event coverage for UserDataStreamChannel
 func TestFullIntegrationSuite_UserData(t *testing.T) {
     if testing.Short() { t.Skip("Skipping in short mode") }
 
@@ -226,7 +458,7 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
     t.Logf("listenKey acquired: %s...", maskListenKey(listenKey))
 
     // Channel + handlers
-    ch := umfuturesstreams.NewUserDataStreamsChannel(stc.client)
+    ch := umfuturesstreams.NewUserDataStreamChannel(stc.client)
     rec := newUMUserDataEventRecorder()
     ch.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { rec.addError(msg); logJSON(t, "ws.error", msg); return nil })
     ch.HandleListenKeyExpiredEvent(func(ctx context.Context, ev *models.ListenKeyExpiredEvent) error { rec.addExpired(ev); return nil })
@@ -252,23 +484,23 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
     // ---------- Request/Response: Start, Ping, Stop ----------
     t.Run("Request_Start", func(t *testing.T) {
         if isTestnet1 {
-            t.Skip("Skipping userDataStream.start on testnet1 (unsupported)")
+            t.Skip("Skipping userDataStream.start on testnet (unsupported)")
         }
         // Attempt WS-based start. Some servers may not support this; treat timeouts/errors as acceptable.
         sid := time.Now().UnixMicro()
         done := make(chan struct{}, 1)
-        var got *models.UserDataStreamsStartResponse
-        cb := func(ctx context.Context, resp *models.UserDataStreamsStartResponse) error {
+        var got *models.UserDataStreamStartResponse
+        cb := func(ctx context.Context, resp *models.UserDataStreamStartResponse) error {
             got = resp; logJSON(t, "userData.start.response", resp)
             select { case done <- struct{}{}: default: }
             return nil
         }
-        req := &models.UserDataStreamsStartRequest{Id: sid}
+        req := &models.UserDataStreamStartRequest{Id: sid}
         req.Params.ApiKey = os.Getenv("BINANCE_API_KEY")
         spCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
         defer cancel()
-        if err := ch.UserDataStreamsStart(spCtx, req, &cb); err != nil {
-            t.Logf("userDataStreamsStart call err (acceptable if unsupported): %v", err)
+        if err := ch.Start(spCtx, req, &cb); err != nil {
+            t.Logf("userDataStreamStart call err (acceptable if unsupported): %v", err)
         }
         select { case <-done: case <-time.After(8 * time.Second): t.Logf("timeout waiting userData.start response (acceptable)") }
         _ = got
@@ -276,22 +508,22 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 
     t.Run("Request_Ping", func(t *testing.T) {
         if isTestnet1 {
-            t.Skip("Skipping userDataStream.ping on testnet1 (unsupported)")
+            t.Skip("Skipping userDataStream.ping on testnet (unsupported)")
         }
         pid := time.Now().UnixMicro()
         done := make(chan struct{}, 1)
-        var got *models.UserDataStreamsPingResponse
-        cb := func(ctx context.Context, resp *models.UserDataStreamsPingResponse) error {
+        var got *models.UserDataStreamPingResponse
+        cb := func(ctx context.Context, resp *models.UserDataStreamPingResponse) error {
             got = resp; logJSON(t, "userData.ping.response", resp)
             select { case done <- struct{}{}: default: }
             return nil
         }
-        req := &models.UserDataStreamsPingRequest{Id: pid}
+        req := &models.UserDataStreamPingRequest{Id: pid}
         req.Params.ApiKey = os.Getenv("BINANCE_API_KEY")
         pgCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
         defer cancel()
-        if err := ch.UserDataStreamsPing(pgCtx, req, &cb); err != nil {
-            t.Logf("userDataStreamsPing call err (acceptable if unsupported): %v", err)
+        if err := ch.Ping(pgCtx, req, &cb); err != nil {
+            t.Logf("userDataStreamPing call err (acceptable if unsupported): %v", err)
         }
         select { case <-done: case <-time.After(8 * time.Second): t.Logf("timeout waiting userData.ping response (acceptable)") }
         _ = got
@@ -299,22 +531,22 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 
     t.Run("Request_Stop", func(t *testing.T) {
         if isTestnet1 {
-            t.Skip("Skipping userDataStream.stop on testnet1 (unsupported)")
+            t.Skip("Skipping userDataStream.stop on testnet (unsupported)")
         }
         sid := time.Now().UnixMicro()
         done := make(chan struct{}, 1)
-        var got *models.UserDataStreamsStopResponse
-        cb := func(ctx context.Context, resp *models.UserDataStreamsStopResponse) error {
+        var got *models.UserDataStreamStopResponse
+        cb := func(ctx context.Context, resp *models.UserDataStreamStopResponse) error {
             got = resp; logJSON(t, "userData.stop.response", resp)
             select { case done <- struct{}{}: default: }
             return nil
         }
-        req := &models.UserDataStreamsStopRequest{Id: sid}
+        req := &models.UserDataStreamStopRequest{Id: sid}
         req.Params.ApiKey = os.Getenv("BINANCE_API_KEY")
         spCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
         defer cancel()
-        if err := ch.UserDataStreamsStop(spCtx, req, &cb); err != nil {
-            t.Logf("userDataStreamsStop call err (acceptable if unsupported): %v", err)
+        if err := ch.Stop(spCtx, req, &cb); err != nil {
+            t.Logf("userDataStreamStop call err (acceptable if unsupported): %v", err)
         }
         select { case <-done: case <-time.After(8 * time.Second): t.Logf("timeout waiting userData.stop response (acceptable)") }
         _ = got
@@ -332,11 +564,36 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         } else {
             t.Logf("mark price fetch failed; using fallback: %v", err)
         }
-        // Place a BUY 0.001 at 50%% of mark price to ensure it does not fill
-        q := "0.001"
-        price := ref * 0.5
-        if err := placeTestLimitOrder(t, symUP, "BUY", q, price); err != nil {
-            t.Logf("place test limit order failed (acceptable in CI without balance): %v", err)
+        // Build params from exchange info to satisfy precision and notional rules
+        rc := newRESTClientUserData()
+        qStr, pStr := "", ""
+        if qty, px, e := calcLimitOrderParams(context.Background(), rc, symUP, ref*0.98); e == nil {
+            qStr, pStr = qty, px
+        } else {
+            // fallback
+            qStr = "0.001"
+            pStr = fmt.Sprintf("%.2f", ref*0.98)
+        }
+        t.Logf("placing test LIMIT order: symbol=%s qty=%s price=%s (ref=%.8f)", symUP, qStr, pStr, ref)
+        // Place a BUY limit order; if rejected due to margin, fall back to test endpoint
+        if err := placeTestLimitOrder(t, symUP, "BUY", qStr, pStr); err != nil {
+            t.Logf("live order rejected (tolerated): %v", err)
+            if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+                t.Logf("REST error status=%s body=%s", ge.Error(), string(ge.Body()))
+            }
+            // Try test endpoint to validate request shape (no event expected)
+            if ctx, e2 := restAuthContextUser(); e2 == nil {
+                ts := time.Now().UnixMilli()
+                _, _, err2 := rc.FuturesAPI.CreateOrderTestV1(ctx).
+                    Symbol(symUP).Side("BUY").Type_("LIMIT").TimeInForce("GTC").Quantity(qStr).Price(pStr).Timestamp(ts).
+                    RecvWindow(5000).Execute()
+                if err2 != nil {
+                    t.Logf("test order rejected: %v", err2)
+                    if ge2, ok2 := err2.(*restum.GenericOpenAPIError); ok2 {
+                        t.Logf("REST error status=%s body=%s", ge2.Error(), string(ge2.Body()))
+                    }
+                }
+            }
         }
         // Wait for at least one ORDER_TRADE_UPDATE (NEW or rejected)
         _ = rec.waitForMin("ORDER_TRADE_UPDATE", 1, eventWait())
@@ -344,10 +601,12 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         t.Logf("ORDER_TRADE_UPDATE events: %d", cnt)
         if cnt > 0 {
             ev := rec.ordUpd[len(rec.ordUpd)-1]
-            if ev.Event.EventType != "ORDER_TRADE_UPDATE" { t.Errorf("want e=ORDER_TRADE_UPDATE got %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
+            // Log full typed event for diagnostics
+            logJSON(t, "orderTradeUpdate.event(typed)", ev)
+            if ev.EventType != "ORDER_TRADE_UPDATE" { t.Errorf("want e=ORDER_TRADE_UPDATE got %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
             // Basic order checks
-            ord := ev.Event.OrderDetails
+            ord := ev.OrderDetails
             assertNonEmpty(t, ord.Symbol, "symbol")
             assertNonEmpty(t, ord.Side, "side")
             assertNonEmpty(t, ord.OrderType, "orderType")
@@ -358,31 +617,142 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
     })
 
     t.Run("AccountConfigUpdateEvent", func(t *testing.T) {
+        // Cancel all open orders to allow toggling position mode
+        cancelAllOpenOrders(t)
+
+        // Get current position mode
+        rc := newRESTClientUserData()
+        ctx, err := restAuthContextUser()
+        if err != nil {
+            t.Logf("position mode: auth error: %v", err)
+        }
+        var original *bool
+        if ctx != nil {
+            ts := time.Now().UnixMilli()
+            cur, _, gerr := rc.FuturesAPI.GetPositionSideDualV1(ctx).Timestamp(ts).RecvWindow(5000).Execute()
+            if gerr != nil {
+                if ge, ok := gerr.(*restum.GenericOpenAPIError); ok {
+                    t.Logf("get position mode failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+                } else {
+                    t.Logf("get position mode failed: %v", gerr)
+                }
+            } else if cur != nil && cur.DualSidePosition != nil {
+                original = cur.DualSidePosition
+                t.Logf("position mode current_dual=%v", *original)
+            }
+        }
+
         // Flip position mode to trigger config update; ignore errors in restricted envs
         if err := togglePositionMode(t); err != nil {
             t.Logf("toggle position mode failed (acceptable): %v", err)
         }
+
+        // Ensure we restore the original mode at the end
+        if original != nil && ctx != nil {
+            defer func() {
+                // Re-cancel any open orders just in case
+                cancelAllOpenOrders(t)
+                target := "false"
+                if *original { target = "true" }
+                ts := time.Now().UnixMilli()
+                _, _, e := rc.FuturesAPI.CreatePositionSideDualV1(ctx).DualSidePosition(target).Timestamp(ts).RecvWindow(5000).Execute()
+                if e != nil {
+                    if ge, ok := e.(*restum.GenericOpenAPIError); ok {
+                        t.Logf("restore position mode failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+                    } else {
+                        t.Logf("restore position mode failed: %v", e)
+                    }
+                } else {
+                    t.Logf("restored position mode to dual=%v", *original)
+                }
+            }()
+        }
+
         _ = rec.waitForMin("ACCOUNT_CONFIG_UPDATE", 1, eventWait())
         cnt := rec.count("ACCOUNT_CONFIG_UPDATE")
         t.Logf("ACCOUNT_CONFIG_UPDATE events: %d", cnt)
+        if cnt == 0 {
+            // Fallback trigger: change leverage to generate ACCOUNT_CONFIG_UPDATE (ac)
+            sym, err := restPickSymbol(context.Background())
+            if err != nil || sym == "" { sym = "BTCUSDT" }
+            t.Logf("fallback: attempting leverage change on %s to trigger ACCOUNT_CONFIG_UPDATE", sym)
+            rc := newRESTClientUserData()
+            ctx, aerr := restAuthContextUser()
+            if aerr == nil {
+                // discover current leverage via position risk
+                ts := time.Now().UnixMilli()
+                risks, _, rerr := rc.FuturesAPI.GetPositionRiskV2(ctx).Symbol(sym).Timestamp(ts).RecvWindow(5000).Execute()
+                curLev := 10
+                if rerr != nil {
+                    if ge, ok := rerr.(*restum.GenericOpenAPIError); ok {
+                        t.Logf("get positionRisk failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+                    } else { t.Logf("get positionRisk failed: %v", rerr) }
+                } else {
+                    for _, it := range risks { if it.Symbol != nil && strings.EqualFold(*it.Symbol, sym) && it.Leverage != nil { if v, e := strconv.Atoi(*it.Leverage); e == nil { curLev = v; break } } }
+                }
+                newLev := 11
+                if curLev >= 11 { newLev = 10 }
+                t.Logf("leverage change: current=%d -> target=%d (symbol=%s)", curLev, newLev, sym)
+                ts2 := time.Now().UnixMilli()
+                _, _, lerr := rc.FuturesAPI.CreateLeverageV1(ctx).Symbol(sym).Leverage(int32(newLev)).Timestamp(ts2).RecvWindow(5000).Execute()
+                if lerr != nil {
+                    if ge, ok := lerr.(*restum.GenericOpenAPIError); ok {
+                        t.Logf("set leverage failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+                    } else { t.Logf("set leverage failed: %v", lerr) }
+                } else {
+                    _ = rec.waitForMin("ACCOUNT_CONFIG_UPDATE", 1, eventWait())
+                    cnt = rec.count("ACCOUNT_CONFIG_UPDATE")
+                    t.Logf("ACCOUNT_CONFIG_UPDATE events after leverage change: %d", cnt)
+                    // restore leverage
+                    ts3 := time.Now().UnixMilli()
+                    _, _, r2 := rc.FuturesAPI.CreateLeverageV1(ctx).Symbol(sym).Leverage(int32(curLev)).Timestamp(ts3).RecvWindow(5000).Execute()
+                    if r2 != nil {
+                        if ge, ok := r2.(*restum.GenericOpenAPIError); ok {
+                            t.Logf("restore leverage failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+                        } else { t.Logf("restore leverage failed: %v", r2) }
+                    } else {
+                        t.Logf("restored leverage to %d for %s", curLev, sym)
+                    }
+                }
+            } else {
+                t.Logf("fallback leverage change skipped: auth error: %v", aerr)
+            }
+        }
         if cnt > 0 {
             ev := rec.cfgUpd[len(rec.cfgUpd)-1]
-            if ev.Event.EventType != "ACCOUNT_CONFIG_UPDATE" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
+            if ev.EventType != "ACCOUNT_CONFIG_UPDATE" { t.Logf("unexpected event type: %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
         } else {
             t.Logf("no ACCOUNT_CONFIG_UPDATE received (acceptable)")
         }
     })
 
     t.Run("AccountUpdateEvent", func(t *testing.T) {
-        // Often emitted on balance/position updates; may not occur in all envs
+        // Often emitted on balance/position updates
         _ = rec.waitForMin("ACCOUNT_UPDATE", 1, eventWait())
         cnt := rec.count("ACCOUNT_UPDATE")
         t.Logf("ACCOUNT_UPDATE events: %d", cnt)
+        if cnt == 0 {
+            // Try to induce by placing a tiny MARKET order
+            sym, err := restPickSymbol(context.Background())
+            if err != nil || sym == "" { sym = "BTCUSDT" }
+            ref := 30000.0
+            if p, err := restMarkPrice(context.Background(), sym); err == nil && p > 0 { ref = p }
+            rc := newRESTClientUserData()
+            if qty, _, e := calcLimitOrderParams(context.Background(), rc, sym, ref); e == nil {
+                t.Logf("attempting small market order for ACCOUNT_UPDATE: symbol=%s qty=%s", sym, qty)
+                if err := placeTestMarketOrder(t, sym, "BUY", qty); err != nil {
+                    t.Logf("market order rejected (acceptable): %v", err)
+                }
+                _ = rec.waitForMin("ACCOUNT_UPDATE", 1, eventWait())
+                cnt = rec.count("ACCOUNT_UPDATE")
+                t.Logf("ACCOUNT_UPDATE events after market order: %d", cnt)
+            }
+        }
         if cnt > 0 {
             ev := rec.acctUpd[len(rec.acctUpd)-1]
-            if ev.Event.EventType != "ACCOUNT_UPDATE" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
+            if ev.EventType != "ACCOUNT_UPDATE" { t.Logf("unexpected event type: %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
         } else {
             t.Logf("no ACCOUNT_UPDATE received (acceptable)")
         }
@@ -395,21 +765,37 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         t.Logf("MARGIN_CALL events: %d", cnt)
         if cnt > 0 {
             ev := rec.marginCal[len(rec.marginCal)-1]
-            if ev.Event.EventType != "MARGIN_CALL" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
+            if ev.EventType != "MARGIN_CALL" { t.Logf("unexpected event type: %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
         }
     })
 
     t.Run("TradeLiteEvent", func(t *testing.T) {
-        // Might emit on fills; validate if present
+        // Try to induce by placing a tiny MARKET order if not seen
         _ = rec.waitForMin("TRADE_LITE", 1, time.Second*3)
         cnt := rec.count("TRADE_LITE")
         t.Logf("TRADE_LITE events: %d", cnt)
+        if cnt == 0 {
+            sym, err := restPickSymbol(context.Background())
+            if err != nil || sym == "" { sym = "BTCUSDT" }
+            ref := 30000.0
+            if p, err := restMarkPrice(context.Background(), sym); err == nil && p > 0 { ref = p }
+            rc := newRESTClientUserData()
+            if qty, _, e := calcLimitOrderParams(context.Background(), rc, sym, ref); e == nil {
+                t.Logf("attempting small market order for TRADE_LITE: symbol=%s qty=%s", sym, qty)
+                if err := placeTestMarketOrder(t, sym, "BUY", qty); err != nil {
+                    t.Logf("market order rejected (acceptable): %v", err)
+                }
+                _ = rec.waitForMin("TRADE_LITE", 1, eventWait())
+                cnt = rec.count("TRADE_LITE")
+                t.Logf("TRADE_LITE events after market order: %d", cnt)
+            }
+        }
         if cnt > 0 {
             ev := rec.tradeLite[len(rec.tradeLite)-1]
-            if ev.Event.EventType != "TRADE_LITE" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
-            assertNonEmpty(t, ev.Event.Symbol, "symbol")
+            if ev.EventType != "TRADE_LITE" { t.Logf("unexpected event type: %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
+            assertNonEmpty(t, ev.Symbol, "symbol")
         }
     })
 
@@ -419,8 +805,8 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         t.Logf("STRATEGY_UPDATE events: %d", cnt)
         if cnt > 0 {
             ev := rec.stratUpd[len(rec.stratUpd)-1]
-            if ev.Event.EventType != "STRATEGY_UPDATE" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
+            if ev.EventType != "STRATEGY_UPDATE" { t.Logf("unexpected event type: %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
         }
     })
 
@@ -430,8 +816,8 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         t.Logf("GRID_UPDATE events: %d", cnt)
         if cnt > 0 {
             ev := rec.gridUpd[len(rec.gridUpd)-1]
-            if ev.Event.EventType != "GRID_UPDATE" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
+            if ev.EventType != "GRID_UPDATE" { t.Logf("unexpected event type: %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
         }
     })
 
@@ -442,8 +828,8 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         t.Logf("CONDITIONAL_ORDER_TRIGGER_REJECT events: %d", cnt)
         if cnt > 0 {
             ev := rec.condRej[len(rec.condRej)-1]
-            if ev.Event.EventType != "CONDITIONAL_ORDER_TRIGGER_REJECT" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
-            assertRecentMs(t, ev.Event.EventTime, 24*time.Hour, "eventTime")
+            if ev.EventType != "CONDITIONAL_ORDER_TRIGGER_REJECT" { t.Logf("unexpected event type: %s", ev.EventType) }
+            assertRecentMs(t, ev.EventTime, 24*time.Hour, "eventTime")
         }
     })
 
@@ -453,7 +839,7 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         t.Logf("listenKeyExpired events: %d", cnt)
         if cnt > 0 {
             ev := rec.expired[len(rec.expired)-1]
-            if ev.Event.EventType != "listenKeyExpired" { t.Logf("unexpected event type: %s", ev.Event.EventType) }
+            if ev.EventType != "listenKeyExpired" { t.Logf("unexpected event type: %s", ev.EventType) }
         }
     })
 

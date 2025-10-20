@@ -84,8 +84,8 @@ func ensureDefaultServer(client *umfuturesstreams.Client) error {
             return nil
         }
     }
-    if err := client.SetActiveServer("testnet1"); err != nil {
-        return fmt.Errorf("failed to select testnet server 'testnet1': %w", err)
+    if err := client.SetActiveServer("testnet"); err != nil {
+        return fmt.Errorf("failed to select testnet server 'testnet': %w", err)
     }
     return nil
 }
@@ -108,8 +108,8 @@ func getTestConfigs() []TestConfig {
 type StreamTestClient struct {
     client     *umfuturesstreams.Client
     config     TestConfig
-    combinedCh *umfuturesstreams.CombinedMarketStreamsChannel
-    marketCh   *umfuturesstreams.MarketStreamsChannel
+    combinedCh *umfuturesstreams.CombinedMarketStreamChannel
+    marketCh   *umfuturesstreams.MarketStreamChannel
 
     eventsMu       sync.RWMutex
     eventsReceived []interface{}

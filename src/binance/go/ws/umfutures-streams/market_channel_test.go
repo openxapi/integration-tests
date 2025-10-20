@@ -108,7 +108,7 @@ func (r *umMarketEventRecorder) waitForMin(key string, min int, timeout time.Dur
     return nil
 }
 
-// TestFullIntegrationSuite_Market covers request/response + event handlers for MarketStreamsChannel
+// TestFullIntegrationSuite_Market covers request/response + event handlers for MarketStreamChannel
 func TestFullIntegrationSuite_Market(t *testing.T) {
     if testing.Short() { t.Skip("Skipping in short mode") }
 
@@ -128,8 +128,8 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
     stc, err := NewStreamTestClientDedicated(config)
     if err != nil { t.Fatalf("failed to create client: %v", err) }
 
-    // Force mainnet1 for this suite per instruction
-    _ = stc.client.SetActiveServer("mainnet1")
+    // Force mainnet for this suite per instruction
+    _ = stc.client.SetActiveServer("mainnet")
 
     if as := stc.client.GetActiveServer(); as != nil {
         t.Logf("Active WS server: name=%s url=%s", as.Name, as.URL)
@@ -145,7 +145,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
     t.Logf("Using symbol from REST: upper=%s lower=%s", symUpper, symLower)
 
     // Prepare a channel instance and connect once for the entire suite
-    market := umfuturesstreams.NewMarketStreamsChannel(stc.client)
+    market := umfuturesstreams.NewMarketStreamChannel(stc.client)
     // Record events from the start of the suite
     rec := newUMMarketEventRecorder()
     market.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { logJSON(t, "ws.error", msg); return nil })
@@ -204,14 +204,14 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
             return nil
         }
         req := &models.SubscribeRequest{Id: sid, Params: []string{markPath, aggPath}}
-        if err := market.MarketStreamsSubscribe(context.Background(), req, &subCb); err != nil {
+        if err := market.Subscribe(context.Background(), req, &subCb); err != nil {
             t.Fatalf("subscribe call failed: %v", err)
         }
         select { case <-subDone: case <-time.After(10 * time.Second): t.Errorf("timeout waiting subscribe response") }
         if gotSub == nil { t.Fatalf("did not capture subscribe response") }
         // Cleanup to avoid noise
         var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
-        _ = market.MarketStreamsUnsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{markPath}}, &unsubCb)
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{markPath}}, &unsubCb)
     })
 
     t.Run("Request_ListSubscriptions", func(t *testing.T) {
@@ -220,7 +220,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         if err != nil { t.Fatalf("build aggTrade stream: %v", err) }
         // Subscribe first so list has at least one entry
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{aggPath}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{aggPath}}, &subCb)
         lid := time.Now().UnixMicro()
         listDone := make(chan struct{}, 1)
         var got *models.ListSubscriptionsResponse
@@ -235,18 +235,18 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
             select { case listDone <- struct{}{}: default: }
             return nil
         }
-        if err := market.MarketStreamsListSubscriptions(context.Background(), &models.ListSubscriptionsRequest{Id: lid}, &listCb); err != nil {
+        if err := market.ListSubscriptions(context.Background(), &models.ListSubscriptionsRequest{Id: lid}, &listCb); err != nil {
             t.Fatalf("list subscriptions call failed: %v", err)
         }
         select { case <-listDone: case <-time.After(8 * time.Second): t.Logf("timeout waiting listSubscriptions response") }
         if got == nil { t.Fatalf("did not capture listSubscriptions response") }
         // Cleanup
         var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
-        _ = market.MarketStreamsUnsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{aggPath}}, &unsubCb)
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{aggPath}}, &unsubCb)
     })
 
     t.Run("Request_SetProperty", func(t *testing.T) {
-        // Use MarketStreams setProperty on active connection (do not use combined here)
+        // Use MarketStream setProperty on active connection (do not use combined here)
         pid := time.Now().UnixMicro()
         setDone := make(chan struct{}, 1)
         var gotSet *models.SetPropertyResponse
@@ -262,7 +262,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         // Property 'combined' is defined in the API; some servers may ignore it on single streams — treat timeouts/errors as acceptable.
         setReq := &models.SetPropertyRequest{Id: pid, Params: []interface{}{"combined", false}}
         logJSON(t, "setProperty.request", setReq)
-        if err := market.MarketStreamsSetProperty(spCtx, setReq, &setCb); err != nil {
+        if err := market.SetProperty(spCtx, setReq, &setCb); err != nil {
             le := strings.ToLower(err.Error())
             if strings.Contains(le, "deadline") { t.Logf("setProperty timeout (acceptable): %v", err) } else { t.Logf("setProperty err (acceptable): %v", err) }
         }
@@ -271,7 +271,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
     })
 
     t.Run("Request_GetProperty", func(t *testing.T) {
-        // Query property on MarketStreams (not combined)
+        // Query property on MarketStream (not combined)
         gid := time.Now().UnixMicro()
         getDone := make(chan struct{}, 1)
         var gotGet *models.GetPropertyResponse
@@ -284,7 +284,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         }
         getReq := &models.GetPropertyRequest{Id: gid, Params: []string{"combined"}}
         logJSON(t, "getProperty.request", getReq)
-        if err := market.MarketStreamsGetProperty(context.Background(), getReq, &getCb); err != nil {
+        if err := market.GetProperty(context.Background(), getReq, &getCb); err != nil {
             t.Logf("getProperty call err (acceptable on some servers): %v", err)
         }
         select { case <-getDone: case <-time.After(8 * time.Second): t.Logf("timeout waiting getProperty response (acceptable)") }
@@ -297,7 +297,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildAggregateTradeEventStream(0, ag.Values())
         if err != nil { t.Fatalf("build aggTrade stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("aggTrade", 1, eventWait())
         cnt := rec.count("aggTrade")
         t.Logf("aggTrade events received: %d", cnt)
@@ -316,7 +316,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildMarkPriceEventStream(0, mp.Values())
         if err != nil { t.Fatalf("build markPrice stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("markPrice", 1, eventWait())
         cnt := rec.count("markPrice")
         t.Logf("markPrice events received: %d", cnt)
@@ -347,7 +347,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildKlineEventStream(0, kp.Values())
         if err != nil { t.Fatalf("build kline stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("kline", 1, eventWait())
         cnt := rec.count("kline")
         t.Logf("kline events received: %d", cnt)
@@ -366,7 +366,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildTickerEventStream(0, tp.Values())
         if err != nil { t.Fatalf("build ticker stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("ticker", 1, eventWait())
         cnt := rec.count("ticker")
         t.Logf("ticker events received: %d", cnt)
@@ -385,7 +385,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildMiniTickerEventStream(0, mp.Values())
         if err != nil { t.Fatalf("build miniTicker stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("miniTicker", 1, eventWait())
         cnt := rec.count("miniTicker")
         t.Logf("miniTicker events received: %d", cnt)
@@ -404,7 +404,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildBookTickerEventStream(0, bp.Values())
         if err != nil { t.Fatalf("build bookTicker stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("bookTicker", 1, eventWait())
         cnt := rec.count("bookTicker")
         t.Logf("bookTicker events received: %d", cnt)
@@ -424,7 +424,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildLiquidationEventStream(0, lp.Values())
         if err != nil { t.Fatalf("build liquidation stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("liquidation", 1, eventWait())
         cnt := rec.count("liquidation")
         t.Logf("liquidation events received: %d", cnt)
@@ -453,7 +453,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildPartialDepthEventStream(1, dp.Values())
         if err != nil { t.Fatalf("build partial depth stream: %v", err) }
         var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("partialDepth", 1, eventWait())
         cnt := rec.count("partialDepth")
         t.Logf("partialDepth events received: %d", cnt)
@@ -470,7 +470,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildAllMarkPricesEventStream(0, nil)
         if err != nil { t.Fatalf("build allMarkPrices stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("allMarkPrices", 1, eventWait())
         cnt := rec.count("allMarkPrices")
         t.Logf("allMarkPrices events received: %d", cnt)
@@ -485,14 +485,14 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
             t.Logf("no allMarkPrices event received (acceptable)")
         }
         var unsub func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
-        _ = market.MarketStreamsUnsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsub)
+        _ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &unsub)
     })
 
     t.Run("AllMiniTickersEvent", func(t *testing.T) {
         path, err := umfuturesstreams.BuildAllMiniTickersEventStream(0, nil)
         if err != nil { t.Fatalf("build allMiniTicker stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("allMiniTickers", 1, eventWait())
         cnt := rec.count("allMiniTickers")
         t.Logf("allMiniTickers events received: %d", cnt)
@@ -503,7 +503,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildAllTickersEventStream(0, nil)
         if err != nil { t.Fatalf("build allTickers stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("allTickers", 1, eventWait())
         cnt := rec.count("allTickers")
         t.Logf("allTickers events received: %d", cnt)
@@ -514,7 +514,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildAllBookTickersEventStream(0, nil)
         if err != nil { t.Fatalf("build allBookTicker stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("allBookTickers", 1, eventWait())
         cnt := rec.count("allBookTickers")
         t.Logf("allBookTickers events received: %d", cnt)
@@ -525,7 +525,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildAllLiquidationsEventStream(0, nil)
         if err != nil { t.Fatalf("build allLiquidations stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("allLiquidations", 1, eventWait())
         cnt := rec.count("allLiquidations")
         t.Logf("allLiquidations events received: %d", cnt)
@@ -554,7 +554,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildCompositeIndexEventStream(0, cp.Values())
         if err != nil { t.Fatalf("build compositeIndex stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("compositeIndex", 1, eventWait())
         cnt := rec.count("compositeIndex")
         t.Logf("compositeIndex events received: %d", cnt)
@@ -567,7 +567,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildAssetIndexEventStream(0, ap.Values())
         if err != nil { t.Fatalf("build assetIndex stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("assetIndex", 1, eventWait())
         cnt := rec.count("assetIndex")
         t.Logf("assetIndex events received: %d", cnt)
@@ -578,7 +578,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildAllAssetIndexesEventStream(0, nil)
         if err != nil { t.Fatalf("build allAssetIndex stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("allAssetIndexes", 1, eventWait())
         cnt := rec.count("allAssetIndexes")
         t.Logf("allAssetIndexes events received: %d", cnt)
@@ -590,7 +590,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
         path, err := umfuturesstreams.BuildContinuousKlineEventStream(0, cp.Values())
         if err != nil { t.Fatalf("build continuousKline stream: %v", err) }
         subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = market.MarketStreamsSubscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
+        _ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{path}}, &subCb)
         _ = rec.waitForMin("continuousKline", 1, eventWait())
         cnt := rec.count("continuousKline")
         t.Logf("continuousKline events received: %d", cnt)
