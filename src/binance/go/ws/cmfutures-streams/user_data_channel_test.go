@@ -370,7 +370,7 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 
     t.Run("Request_Start", func(t *testing.T) {
         if isTestnet { t.Skip("Skip userDataStream.start on testnet (unsupported)") }
-        sid := time.Now().UnixMicro()
+        sid := newRequestID()
         before := rec.count("error")
         // Server is expected to reject this method; we assert error is captured
         req := &models.UserDataStreamStartRequest{Id: sid}
@@ -384,7 +384,9 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         if got > before {
             em := rec.errors[len(rec.errors)-1]
             if em == nil { t.Fatalf("nil error captured") }
-            if em.Id != sid { t.Logf("error id mismatch: want=%d got=%d", sid, em.Id) }
+            if !msgIDEqual(em.Id, sid) {
+                t.Logf("error id mismatch: want=%s got=%s", sid.String(), em.Id.String())
+            }
             if em.Error.Code == 0 || strings.TrimSpace(em.Error.Msg) == "" {
                 t.Errorf("invalid error payload: %+v", em)
             }
@@ -393,16 +395,23 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 
     t.Run("Request_Ping", func(t *testing.T) {
         if isTestnet { t.Skip("Skip userDataStream.ping on testnet (unsupported)") }
-        pid := time.Now().UnixMicro()
+        pid := newRequestID()
         done := make(chan struct{}, 1)
-        cb := func(ctx context.Context, resp *models.UserDataStreamPingResponse) error { logJSON(t, "userData.ping.response", resp); select { case done <- struct{}{}: default: }; return nil }
+        cb := func(ctx context.Context, resp *models.UserDataStreamPingResponse) error {
+            if resp != nil && !msgIDEqual(resp.Id, pid) {
+                t.Logf("ping response id mismatch: want=%s got=%s", pid.String(), resp.Id.String())
+            }
+            logJSON(t, "userData.ping.response", resp)
+            select { case done <- struct{}{}: default: }
+            return nil
+        }
         if err := ch.Ping(context.Background(), &models.UserDataStreamPingRequest{Id: pid}, &cb); err != nil { t.Logf("ping err (acceptable): %v", err) }
         select { case <-done: case <-time.After(5 * time.Second): t.Logf("timeout waiting ping response (acceptable)") }
     })
 
     t.Run("Request_Stop", func(t *testing.T) {
         if isTestnet { t.Skip("Skip userDataStream.stop on testnet (unsupported)") }
-        rid := time.Now().UnixMicro()
+        rid := newRequestID()
         before := rec.count("error")
         req := &models.UserDataStreamStopRequest{Id: rid}
         if k := os.Getenv("BINANCE_API_KEY"); k != "" { req.Params.ApiKey = k }
@@ -415,6 +424,9 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
         if got > before {
             em := rec.errors[len(rec.errors)-1]
             if em == nil { t.Fatalf("nil error captured") }
+            if !msgIDEqual(em.Id, rid) {
+                t.Logf("stop error id mismatch: want=%s got=%s", rid.String(), em.Id.String())
+            }
             if em.Error.Code == 0 || strings.TrimSpace(em.Error.Msg) == "" {
                 t.Errorf("invalid error payload: %+v", em)
             }

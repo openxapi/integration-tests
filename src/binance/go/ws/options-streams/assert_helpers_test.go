@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/openxapi/binance-go/ws/options-streams/models"
 )
 
 func assertNonEmpty(t *testing.T, v string, name string) {
@@ -88,4 +90,12 @@ func optionUnderlying(symbol string) string {
 		return symbol[:i]
 	}
 	return symbol
+}
+
+func assertMessageIDInt64(t *testing.T, id models.MessageID, want int64, label string) {
+	t.Helper()
+	got, ok := id.ValInt64()
+	if !ok || got != want {
+		t.Errorf("%s id mismatch: want %d got %s", label, want, id.String())
+	}
 }

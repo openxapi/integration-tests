@@ -5,6 +5,8 @@ import (
     "strings"
     "testing"
     "time"
+
+    "github.com/openxapi/binance-go/ws/cmfutures-streams/models"
 )
 
 func assertNonEmpty(t *testing.T, v string, name string) {
@@ -68,3 +70,12 @@ func assertWithinTolerancePercent(t *testing.T, a, b, tolPct float64, label stri
     }
 }
 
+// newRequestID returns a MessageID seeded from current time for outbound requests.
+func newRequestID() models.MessageID {
+    return models.NewMessageIDInt64(time.Now().UnixMicro())
+}
+
+// msgIDEqual compares two MessageID values using their canonical string form.
+func msgIDEqual(a, b models.MessageID) bool {
+    return a.String() == b.String()
+}

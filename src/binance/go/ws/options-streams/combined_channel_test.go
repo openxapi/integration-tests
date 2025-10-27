@@ -49,14 +49,14 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		t.Logf("Active WS server: <nil>")
 	}
 
-    // Combined channel
-    ch := optionsstreams.NewCombinedMarketStreamChannel(stc.client)
+	// Combined channel
+	ch := optionsstreams.NewCombinedMarketStreamChannel(stc.client)
 	// Top-level error handler is acceptable
 	ch.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { logJSON(t, "ws.error", msg); return nil })
 	// Suite-level event recorder and global typed handlers
 	rec := newMarketEventRecorder()
-    // Always register wrapper handler to mark combined messages as handled
-    ch.HandleCombinedMarketStreamEvent(func(ctx context.Context, ev *models.CombinedMarketStreamEvent) error { return nil })
+	// Always register wrapper handler to mark combined messages as handled
+	ch.HandleCombinedMarketStreamEvent(func(ctx context.Context, ev *models.CombinedMarketStreamEvent) error { return nil })
 	ch.HandleIndexPriceEvent(func(ctx context.Context, ev *models.IndexPriceEvent) error { rec.addIndex(ev); return nil })
 	ch.HandleMarkPriceEvent(func(ctx context.Context, ev *models.MarkPriceEvent) error { rec.addMark(ev); return nil })
 	ch.HandleKlineEvent(func(ctx context.Context, ev *models.KlineEvent) error { rec.addKline(ev); return nil })
@@ -125,15 +125,14 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		}
 		start := rec.count("index")
 		sid := time.Now().UnixMicro()
+		sidMsg := models.NewMessageIDInt64(sid)
 		subDone := make(chan struct{}, 1)
-        subCb := func(ctx context.Context, resp *models.SubscribeResponse) error {
+		subCb := func(ctx context.Context, resp *models.SubscribeResponse) error {
 			if resp == nil {
 				t.Errorf("nil subscribe response")
 				return nil
 			}
-			if resp.Id != sid {
-				t.Errorf("subscribe id mismatch: want %d got %d", sid, resp.Id)
-			}
+			assertMessageIDInt64(t, resp.Id, sid, "subscribe response")
 			logJSON(t, "subscribe.response", resp)
 			select {
 			case subDone <- struct{}{}:
@@ -141,7 +140,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 			}
 			return nil
 		}
-        if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: sid, Params: []string{stream}}, &subCb); err != nil {
+		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: sidMsg, Params: []string{stream}}, &subCb); err != nil {
 			t.Fatalf("subscribe call failed: %v", err)
 		}
 		t.Logf("subscribe request sent (id=%d) for %s", sid, stream)
@@ -169,20 +168,19 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build index stream: %v", err)
 		}
-        subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
-        if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb); err != nil {
-            t.Fatalf("subscribe before list failed: %v", err)
-        }
+		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb); err != nil {
+			t.Fatalf("subscribe before list failed: %v", err)
+		}
 		lid := time.Now().UnixMicro()
+		lidMsg := models.NewMessageIDInt64(lid)
 		lsDone := make(chan struct{}, 1)
 		lsCb := func(ctx context.Context, resp *models.ListSubscriptionsResponse) error {
 			if resp == nil {
 				t.Errorf("nil list subscriptions response")
 				return nil
 			}
-			if resp.Id != lid {
-				t.Errorf("list id mismatch: want %d got %d", lid, resp.Id)
-			}
+			assertMessageIDInt64(t, resp.Id, lid, "listSubscriptions response")
 			if resp.Result != nil && !contains(resp.Result, stream) {
 				t.Logf("list did not include %s: %v", stream, resp.Result)
 			}
@@ -193,9 +191,9 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 			}
 			return nil
 		}
-        if err := ch.ListSubscriptions(context.Background(), &models.ListSubscriptionsRequest{Id: lid}, &lsCb); err != nil {
-            t.Fatalf("list subscriptions call failed: %v", err)
-        }
+		if err := ch.ListSubscriptions(context.Background(), &models.ListSubscriptionsRequest{Id: lidMsg}, &lsCb); err != nil {
+			t.Fatalf("list subscriptions call failed: %v", err)
+		}
 		t.Logf("listSubscriptions request sent (id=%d)", lid)
 		select {
 		case <-lsDone:
@@ -203,21 +201,20 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 			t.Logf("timeout waiting listSubscriptions response (acceptable)")
 		}
 		// Clean up
-        unsubCb := func(context.Context, *models.UnsubscribeResponse) error { return nil }
-        _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb)
+		unsubCb := func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb)
 	})
 
 	t.Run("Request_SetProperty", func(t *testing.T) {
 		pid := time.Now().UnixMicro()
+		pidMsg := models.NewMessageIDInt64(pid)
 		setDone := make(chan struct{}, 1)
 		setCb := func(ctx context.Context, resp *models.SetPropertyResponse) error {
 			if resp == nil {
 				t.Errorf("nil setProperty response")
 				return nil
 			}
-			if resp.Id != pid {
-				t.Errorf("setProperty id mismatch: want %d got %d", pid, resp.Id)
-			}
+			assertMessageIDInt64(t, resp.Id, pid, "setProperty response")
 			logJSON(t, "setProperty.response", resp)
 			select {
 			case setDone <- struct{}{}:
@@ -227,7 +224,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		}
 		spCtx, spCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer spCancel()
-        if err := ch.SetProperty(spCtx, &models.SetPropertyRequest{Id: pid, Params: []interface{}{"combined", true}}, &setCb); err != nil {
+		if err := ch.SetProperty(spCtx, &models.SetPropertyRequest{Id: pidMsg, Params: []interface{}{"combined", true}}, &setCb); err != nil {
 			le := strings.ToLower(err.Error())
 			if strings.Contains(le, "context deadline") || strings.Contains(le, "deadline exceeded") {
 				t.Logf("setProperty returned timeout (acceptable): %v", err)
@@ -245,15 +242,14 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 
 	t.Run("Request_GetProperty", func(t *testing.T) {
 		gid := time.Now().UnixMicro()
+		gidMsg := models.NewMessageIDInt64(gid)
 		getDone := make(chan struct{}, 1)
 		getCb := func(ctx context.Context, resp *models.GetPropertyResponse) error {
 			if resp == nil {
 				t.Errorf("nil getProperty response")
 				return nil
 			}
-			if resp.Id != gid {
-				t.Errorf("getProperty id mismatch: want %d got %d", gid, resp.Id)
-			}
+			assertMessageIDInt64(t, resp.Id, gid, "getProperty response")
 			logJSON(t, "getProperty.response", resp)
 			select {
 			case getDone <- struct{}{}:
@@ -263,7 +259,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		}
 		gCtx, gCancel := context.WithTimeout(context.Background(), 8*time.Second)
 		defer gCancel()
-        if err := ch.GetProperty(gCtx, &models.GetPropertyRequest{Id: gid, Params: []string{"combined"}}, &getCb); err != nil {
+		if err := ch.GetProperty(gCtx, &models.GetPropertyRequest{Id: gidMsg, Params: []string{"combined"}}, &getCb); err != nil {
 			le := strings.ToLower(err.Error())
 			if strings.Contains(le, "context deadline") || strings.Contains(le, "deadline exceeded") {
 				t.Logf("getProperty returned timeout (acceptable): %v", err)
@@ -286,20 +282,19 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build index stream: %v", err)
 		}
-        subCb := func(ctx context.Context, resp *models.SubscribeResponse) error { return nil }
-        if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb); err != nil {
-            t.Fatalf("subscribe before unsubscribe failed: %v", err)
-        }
+		subCb := func(ctx context.Context, resp *models.SubscribeResponse) error { return nil }
+		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb); err != nil {
+			t.Fatalf("subscribe before unsubscribe failed: %v", err)
+		}
 		uid := time.Now().UnixMicro()
+		uidMsg := models.NewMessageIDInt64(uid)
 		unsubDone := make(chan struct{}, 1)
-        unsubCb := func(ctx context.Context, resp *models.UnsubscribeResponse) error {
+		unsubCb := func(ctx context.Context, resp *models.UnsubscribeResponse) error {
 			if resp == nil {
 				t.Errorf("nil unsubscribe response")
 				return nil
 			}
-			if resp.Id != uid {
-				t.Errorf("unsubscribe id mismatch: want %d got %d", uid, resp.Id)
-			}
+			assertMessageIDInt64(t, resp.Id, uid, "unsubscribe response")
 			logJSON(t, "unsubscribe.response", resp)
 			select {
 			case unsubDone <- struct{}{}:
@@ -307,9 +302,9 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 			}
 			return nil
 		}
-        if err := ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: uid, Params: []string{stream}}, &unsubCb); err != nil {
-            t.Fatalf("unsubscribe call failed: %v", err)
-        }
+		if err := ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: uidMsg, Params: []string{stream}}, &unsubCb); err != nil {
+			t.Fatalf("unsubscribe call failed: %v", err)
+		}
 		t.Logf("unsubscribe request sent (id=%d) for %s", uid, stream)
 		select {
 		case <-unsubDone:
@@ -319,9 +314,9 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	})
 
 	// ---------- Combined Wrapper Event ----------
-    t.Run("CombinedWrapperEvent", func(t *testing.T) {
-        evCh := make(chan *models.CombinedMarketStreamEvent, 1)
-        ch.HandleCombinedMarketStreamEvent(func(ctx context.Context, ev *models.CombinedMarketStreamEvent) error {
+	t.Run("CombinedWrapperEvent", func(t *testing.T) {
+		evCh := make(chan *models.CombinedMarketStreamEvent, 1)
+		ch.HandleCombinedMarketStreamEvent(func(ctx context.Context, ev *models.CombinedMarketStreamEvent) error {
 			select {
 			case evCh <- ev:
 			default:
@@ -336,12 +331,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build index stream: %v", err)
 		}
-        var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb)
-        var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
-        defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb)
-        }()
+		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb)
+		var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		defer func() {
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb)
+		}()
 		cnt := 0
 		select {
 		case ev := <-evCh:
@@ -371,13 +366,13 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 			t.Fatalf("build index stream: %v", err)
 		}
 		// Directly subscribe (no list gating in new SDK)
-        var subCb2 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        start := rec.count("index")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb2)
-        var unsubCb2 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
-        defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb2)
-        }()
+		var subCb2 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		start := rec.count("index")
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb2)
+		var unsubCb2 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		defer func() {
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb2)
+		}()
 		_ = rec.waitForMin("index", start+1, eventWait())
 		if evs := rec.getIndex(); len(evs) > 0 {
 			ev := evs[len(evs)-1]
@@ -412,12 +407,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build markPrice stream: %v", err)
 		}
-        var subCb3 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb3 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		start := rec.count("markPrice")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb3)
-        var unsubCb3 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb3)
+		var unsubCb3 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb3)
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb3)
 		}()
 		_ = rec.waitForMin("markPrice", start+1, eventWait())
 		if evs := rec.getMark(); len(evs) > 0 && evs[len(evs)-1] != nil {
@@ -462,12 +457,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build kline stream: %v", err)
 		}
-        var subCb4 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb4 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		start := rec.count("kline")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb4)
-        var unsubCb4 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb4)
+		var unsubCb4 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb4)
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb4)
 		}()
 		_ = rec.waitForMin("kline", start+1, eventWaitLong())
 		if evs := rec.getKline(); len(evs) > 0 {
@@ -503,12 +498,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build ticker stream: %v", err)
 		}
-        var subCb5 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb5 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		start := rec.count("ticker")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb5)
-        var unsubCb5 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb5)
+		var unsubCb5 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb5)
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb5)
 		}()
 		_ = rec.waitForMin("ticker", start+1, eventWait())
 		if evs := rec.getTicker(); len(evs) > 0 {
@@ -554,13 +549,13 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 				params = append(params, s)
 			}
 		}
-        var subCb6 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb6 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		start := rec.count("tickerByUnderlying")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: params}, &subCb6)
-        var unsubCb6 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: params}, &subCb6)
+		var unsubCb6 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
 			if len(params) > 0 {
-                _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: params}, &unsubCb6)
+				_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: params}, &unsubCb6)
 			}
 		}()
 		_ = rec.waitForMin("tickerByUnderlying", start+1, eventWaitLong())
@@ -592,12 +587,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build trade stream: %v", err)
 		}
-        var subCb7 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb7 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		start := rec.count("trade")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb7)
-        var unsubCb7 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb7)
+		var unsubCb7 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb7)
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb7)
 		}()
 		_ = rec.waitForMin("trade", start+1, eventWaitLong())
 		if evs := rec.getTrade(); len(evs) > 0 {
@@ -631,12 +626,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build partialDepth stream: %v", err)
 		}
-        var subCb8 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb8 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		start := rec.count("partialDepth")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb8)
-        var unsubCb8 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb8)
+		var unsubCb8 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb8)
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb8)
 		}()
 		_ = rec.waitForMin("partialDepth", start+1, eventWaitLong())
 		if evs := rec.getPartialDepth(); len(evs) > 0 {
@@ -672,12 +667,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build newSymbolInfo stream: %v", err)
 		}
-        var subCb10 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb10 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
 		start := rec.count("newSymbolInfo")
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &subCb10)
-        var unsubCb10 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &subCb10)
+		var unsubCb10 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
-            _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: []string{stream}}, &unsubCb10)
+			_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{stream}}, &unsubCb10)
 		}()
 		_ = rec.waitForMin("newSymbolInfo", start+1, eventWait())
 		if evs := rec.getNewSymbolInfo(); len(evs) > 0 {
@@ -711,12 +706,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 				params = append(params, s)
 			}
 		}
-        var subCb9 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
-        _ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: time.Now().UnixMicro(), Params: params}, &subCb9)
-        var unsubCb9 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		var subCb9 func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: params}, &subCb9)
+		var unsubCb9 func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
 		defer func() {
 			if len(params) > 0 {
-                _ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: time.Now().UnixMicro(), Params: params}, &unsubCb9)
+				_ = ch.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: params}, &unsubCb9)
 			}
 		}()
 		// Open interest updates every ~60s; wait longer for the recorder to capture at least one
