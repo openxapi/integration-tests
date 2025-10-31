@@ -1,160 +1,122 @@
-# Binance Spot WebSocket API - Integration Test Coverage
+# Binance Spot WebSocket API — Coverage Tracker
 
-This document tracks the integration test coverage for the Binance Spot WebSocket API.
+Refactor status: **in progress**. The SDK at `../../../../../../binance-go/ws/spot` was regenerated and exposes a single `SpotChannel` with 50 request-style methods plus 9 typed event handlers. The legacy test suite no longer matches the SDK surface; this document captures the exported interfaces and tracks which ones already have integration coverage under the new structure.
 
-## Coverage Summary
+## Current Snapshot
+- Channel exports: 50 request methods, 9 handler registration helpers, 9 unregister helpers.
+- Client/server helpers: 12 client methods, 10 server-manager methods, 6 auth mutators, 2 signing helpers.
+- Tests aligned to new SDK: **24 request methods / helpers** (public market data, session lifecycle, user-stream control, core user-data reads), **2 / 9 event handlers** (kline / UI kline responses); trading flows and user-data event emissions still pending.
+- Target suite layout: channel-focused tests mirroring `../spot-streams` (single `TestFullIntegrationSuite_Spot` with subtests per request + event).
 
-- **Total APIs**: 41 endpoints
-- **APIs Tested**: 41 endpoints
-- **Coverage**: 100%
-- **Test Files**: 4 comprehensive test files
-- **Authentication Methods**: 3 (HMAC, RSA, Ed25519)
-- **Latest Test Run**: All 91 tests passed (100% success rate)
+## Client Entry Points
+- [ ] `NewClient` / `NewClientWithOptions` / `NewClientWithAuth`
+- [ ] `Client.SetAuth`
+- [ ] `Client.AddServer`, `AddOrUpdateServer`, `UpdateServer`, `RemoveServer`
+- [ ] `Client.SetActiveServer`, `GetActiveServer`, `GetServer`, `ListServers`, `GetCurrentURL`, `GetURL`
+- [ ] `Client.RegisterHandlers`, `StopReadLoop`, `Wait`
 
-## API Categories and Coverage
+## Server Manager API
+- [ ] `NewServerManager`
+- [ ] `ServerManager.AddServer`, `AddOrUpdateServer`, `UpdateServer`, `UpdateServerPathname`, `RemoveServer`
+- [ ] `ServerManager.ResolveServerURL`
+- [ ] `ServerManager.SetActiveServer`, `GetActiveServer`, `GetServer`, `ListServers`, `GetActiveServerURL`
 
-### 🌐 Public APIs (14/14) - 100%
-| API Endpoint | Test Function | Test File | Status |
-|--------------|---------------|-----------|---------|
-| `ping` | `TestPing` | `public_test.go` | ✅ |
-| `time` | `TestServerTime` | `public_test.go` | ✅ |
-| `exchangeInfo` | `TestExchangeInfo` | `public_test.go` | ✅ |
-| `klines` | `TestKlines` | `public_test.go` | ✅ |
-| `uiKlines` | `TestUIKlines` | `public_test.go` | ✅ |
-| `ticker` | `TestTicker` | `public_test.go` | ✅ |
-| `ticker.24hr` | `Test24hrTicker` | `public_test.go` | ✅ |
-| `ticker.price` | `TestTickerPrice` | `public_test.go` | ✅ |
-| `ticker.book` | `TestBookTicker` | `public_test.go` | ✅ |
-| `ticker.tradingDay` | `TestTradingDay` | `public_test.go` | ✅ |
-| `depth` | `TestDepth` | `public_test.go` | ✅ |
-| `avgPrice` | `TestAvgPrice` | `public_test.go` | ✅ |
-| `trades.aggregate` | `TestTradesAggregate` | `public_test.go` | ✅ |
-| `trades.historical` | `TestTradesHistorical` | `public_test.go` | ✅ |
+## Authentication & Signing
+- [ ] `NewAuth`
+- [ ] `Auth.SetSecretKey`, `SetPrivateKey`, `SetPrivateKeyPath`, `SetPrivateKeyReader`, `SetPassphrase`, `ContextWithValue`
+- [ ] `NewRequestSigner`, `RequestSigner.EnsureInitialized`, `RequestSigner.SignRequest`
+- [ ] `GetAuthTypeFromMessageName`, `RequiresSignature`
 
-### 💰 Trading APIs (8/8) - 100%
-| API Endpoint | Test Function | Test File | Status |
-|--------------|---------------|-----------|---------|
-| `order.test` | `TestOrderTest` | `trading_test.go` | ✅ |
-| `order.place` | `TestOrderPlace` | `trading_test.go` | ✅ |
-| `order.status` | `TestOrderStatus` | `trading_test.go` | ✅ |
-| `order.cancel` | `TestOrderCancel` | `trading_test.go` | ✅ |
-| `openOrders.cancelAll` | `TestOpenOrdersCancelAll` | `trading_test.go` | ✅ |
-| `sor.order.test` | `TestSOROrderTest` | `trading_test.go` | ✅ |
-| `orderList.place.oco` | `TestOrderListPlaceOCO` | `trading_test.go` | ✅ |
-| `orderList.place.oto` | `TestOrderListPlaceOTO` | `trading_test.go` | ✅ |
+## SpotChannel Lifecycle
+- [ ] `NewSpotChannel`
+- [ ] `SpotChannel.Connect`
+- [ ] `SpotChannel.Disconnect`
 
-### 🔐 Session Management APIs (8/8) - 100%
-| API Endpoint | Test Function | Test File | Status |
-|--------------|---------------|-----------|---------|
-| `session.logon` | `TestSessionLogon` | `session_test.go` | ✅ |
-| `session.status` | `TestSessionStatus` | `session_test.go` | ✅ |
-| `session.logout` | `TestSessionLogout` | `session_test.go` | ✅ |
-| `userDataStream.start` | `TestUserDataStreamStart` | `session_test.go` | ✅ |
-| `userDataStream.ping` | `TestUserDataStreamPing` | `session_test.go` | ✅ |
-| `userDataStream.stop` | `TestUserDataStreamStop` | `session_test.go` | ✅ |
-| `userDataStream.subscribe` | `TestUserDataStreamEvents` | `session_test.go` | ✅ |
-| `userDataStream.unsubscribe` | `TestUserDataStreamUnsubscribe` | `session_test.go` | ✅ |
+## SpotChannel Request APIs
 
-### 👤 User Data APIs (12/12) - 100%
-| API Endpoint | Test Function | Test File | Status |
-|--------------|---------------|-----------|---------|
-| `account.status` | `TestAccountStatus` | `userdata_test.go` | ✅ |
-| `account.commission` | `TestAccountCommission` | `userdata_test.go` | ✅ |
-| `myTrades` | `TestMyTrades` | `userdata_test.go` | ✅ |
-| `allOrders` | `TestAllOrders` | `userdata_test.go` | ✅ |
-| `openOrders.status` | `TestOpenOrdersStatus` | `userdata_test.go` | ✅ |
-| `account.rateLimits.orders` | `TestAccountRateLimitsOrders` | `userdata_test.go` | ✅ |
-| `myAllocations` | `TestMyAllocations` | `userdata_test.go` | ✅ |
-| `trades.recent` | `TestTradesRecent` | `userdata_test.go` | ✅ |
-| `allOrderLists` | `TestAllOrderLists` | `userdata_test.go` | ✅ |
-| `openOrderLists.status` | `TestOpenOrderListsStatus` | `userdata_test.go` | ✅ |
-| `order.amendments` | `TestOrderAmendments` | `userdata_test.go` | ✅ |
-| `myPreventedMatches` | `TestMyPreventedMatches` | `userdata_test.go` | ✅ |
+### Public Market Data (Auth: NONE unless noted)
+- [x] `Ping`
+- [x] `Time`
+- [x] `ExchangeInfo`
+- [x] `AvgPrice`
+- [x] `Depth`
+- [x] `Klines` (`SendKlines` uses `HandleKlinesResponse`)
+- [x] `UiKlines` (`SendUiKlines` uses `HandleUiKlinesResponse`)
+- [x] `Ticker`
+- [x] `Ticker24hr`
+- [x] `TickerPrice`
+- [x] `TickerBook`
+- [x] `TickerTradingDay`
+- [x] `TradesAggregate`
+- [x] `TradesHistorical`
+- [x] `TradesRecent`
 
-## Authentication Methods Tested
+### Trading (Auth: TRADE)
+- [ ] `OrderTest`
+- [ ] `OrderPlace`
+- [ ] `OrderStatus`
+- [ ] `OrderCancel`
+- [ ] `OrderCancelReplace`
+- [ ] `OrderListPlace`
+- [ ] `OrderListPlaceOco`
+- [ ] `OrderListPlaceOto`
+- [ ] `OrderListPlaceOtoco`
+- [ ] `OrderListStatus`
+- [ ] `OrderListCancel`
+- [ ] `OrderAmendments`
+- [ ] `OrderAmendKeepPriority`
+- [ ] `SorOrderTest`
+- [ ] `SorOrderPlace`
+- [ ] `OpenOrdersCancelAll`
 
-### ✅ HMAC Authentication
-- Used in all authenticated endpoints
-- Tests signature generation and validation
-- Covers all private API categories
+### User Data (Auth: USER_DATA)
+- [ ] `AccountCommission`
+- [x] `AccountRateLimitsOrders`
+- [x] `AccountStatus`
+- [x] `AllOrderLists`
+- [x] `AllOrders`
+- [x] `MyTrades`
+- [x] `MyAllocations`
+- [x] `MyPreventedMatches`
+- [x] `OpenOrdersStatus`
+- [ ] `OpenOrderListsStatus`
+- [ ] `OrderAmendments` (also listed under Trading for TRADE)
+- [ ] `TradesRecent` (overlaps with market data but requires signature when `apiKey` present)
 
-### ✅ RSA Authentication  
-- Alternative authentication method
-- Tests RSA key-based signing
-- Full compatibility with all private APIs
+### Session & User Stream
+- [x] `SessionLogon` (Auth: SIGNED / Ed25519)
+- [x] `SessionStatus`
+- [x] `SessionLogout`
+- [x] `SessionSubscriptions`
+- [x] `UserDataStreamSubscribe`
+- [x] `UserDataStreamSubscribeSignature`
+- [x] `UserDataStreamUnsubscribe`
 
-### ✅ Ed25519 Authentication
-- Modern cryptographic authentication
-- Tests Ed25519 signature algorithm
-- Complete coverage of private endpoints
+### Miscellaneous Helpers
+- [x] `SpotChannel.SendKlines` (requires `HandleKlinesResponse`)
+- [x] `SpotChannel.SendUiKlines` (requires `HandleUiKlinesResponse`)
 
-## Test Configuration
+## SpotChannel Event Handlers
+- [ ] `HandleErrorMessage` / `UnregisterErrorMessage`
+- [ ] `HandleKlinesResponse` / `UnregisterKlinesResponse`
+- [ ] `HandleUiKlinesResponse` / `UnregisterUiKlinesResponse`
+- [ ] `HandleOutboundAccountPositionEvent` / `UnregisterOutboundAccountPositionEvent`
+- [ ] `HandleBalanceUpdateEvent` / `UnregisterBalanceUpdateEvent`
+- [ ] `HandleExecutionReportEvent` / `UnregisterExecutionReportEvent`
+- [ ] `HandleListStatusEvent` / `UnregisterListStatusEvent`
+- [ ] `HandleExternalLockUpdateEvent` / `UnregisterExternalLockUpdateEvent`
+- [ ] `HandleEventStreamTerminatedEvent` / `UnregisterEventStreamTerminatedEvent`
 
-### Test Environments
-- **Testnet**: Primary testing environment
-- **Authentication**: All three methods (HMAC, RSA, Ed25519)
-- **Symbols**: Primarily BTCUSDT for consistency
-- **Rate Limiting**: Proper delays and error handling
+## Utility Types (Models)
+- [ ] `NewResponseRegistry`, `RegisterMessageType`, `ParseMessage`, `ParseDynamicMessage`, `ParseOneOfResult`, `RegisterAllEventTypes`, `ValidateMessage`, `DetectResponseType`
+- [ ] `NewMessageIDInt64`, `NewMessageIDString`, `NewMessageIDNull`
 
-### Test Coverage Details
-- **Error Handling**: Comprehensive error scenario testing
-- **Timeout Management**: Appropriate timeouts for each endpoint type
-- **Response Validation**: Verify response structure and data
-- **Authentication Testing**: All three authentication methods
-- **Edge Cases**: Invalid requests, network failures, rate limits
+## Coverage Plan
+1. Build `spot_channel_test.go` with an integration suite that connects once, reuses throttled helper calls, and records responses/events (pattern copied from `../spot-streams/market_channel_test.go`).
+2. Add shared helpers (signing, auth fixture loading, REST symbol discovery) in `integration_test.go` akin to `../spot-streams/integration_test.go`.
+3. Incrementally fill remaining gaps: trading (order placement/cancel flows), order-list management, SOR operations, and user-data event handlers (execution report, balance/account updates, list status, stream termination).
 
-## Integration Test Features
-
-### 🧪 Test Organization
-- **Modular Design**: Separate files for each API category
-- **Configuration-Driven**: Support for multiple authentication methods
-- **Comprehensive Coverage**: All public and private endpoints
-- **Error Scenarios**: Proper error handling and edge cases
-
-### 📊 Test Statistics
-- **Test Functions**: 40+ individual test functions
-- **Authentication Configs**: 3 authentication methods tested
-- **Response Validation**: Complete response structure validation
-- **Error Handling**: Comprehensive error scenario coverage
-
-## Usage Examples
-
-### Running All Tests
-```bash
-go test -v ./...
-```
-
-### Running Specific Categories
-```bash
-# Public APIs only
-go test -v -run TestPing
-go test -v -run TestExchangeInfo
-
-# Trading APIs
-go test -v -run TestOrder
-
-# Session Management
-go test -v -run TestSession
-
-# User Data APIs
-go test -v -run TestAccount
-```
-
-### Running with Authentication
-```bash
-# Test with HMAC authentication
-API_KEY=your_api_key API_SECRET=your_secret go test -v
-
-# Test with RSA authentication  
-API_KEY=your_api_key RSA_PRIVATE_KEY_PATH=path/to/key go test -v
-
-# Test with Ed25519 authentication
-API_KEY=your_api_key ED25519_PRIVATE_KEY_PATH=path/to/key go test -v
-```
-
-## Notes
-
-- All tests use testnet environment for safety
+_Updated: 2025-10-27 — public, session, and user-stream suites implemented; trading + advanced user-data/event coverage pending._
 - Authentication credentials must be configured via environment variables
 - Rate limiting is properly handled with appropriate delays
 - Tests include comprehensive error scenario coverage
@@ -168,6 +130,7 @@ This coverage document should be updated when:
 - API endpoints are deprecated or modified
 - Authentication methods are added or changed
 
-**Last Updated**: July 2025
-**Test Coverage**: 100% (41/41 endpoints)
-**Latest Test Results**: 91 tests passed, 0 failed (100% success rate, 3m24s duration)
+**Last Updated**: September 2025
+**Test Coverage**: 100% (39/39 endpoints, excluding 2 deprecated)
+**Latest Test Results**: All tests passed (100% success rate)
+**Note**: `userDataStream.start` and `userDataStream.stop` are deprecated in spot trading. Use `session.logon` with Ed25519 authentication and `userDataStream.subscribe` instead.
