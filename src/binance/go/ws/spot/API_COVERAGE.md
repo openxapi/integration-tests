@@ -1,11 +1,11 @@
 # Binance Spot WebSocket API — Coverage Tracker
 
-Refactor status: **in progress**. The SDK at `../../../../../../binance-go/ws/spot` was regenerated and exposes a single `SpotChannel` with 50 request-style methods plus 9 typed event handlers. The legacy test suite no longer matches the SDK surface; this document captures the exported interfaces and tracks which ones already have integration coverage under the new structure.
+Refactor status: **in progress**. The regenerated SDK at `../../../../../../binance-go/ws/spot` now exposes a single `SpotChannel` with 49 request operations (plus `Connect` / `Disconnect`) whose callbacks accept `(ctx, resp, error)`, and six typed event handlers. The legacy test suite is being realigned to this surface; this document captures the exported interfaces and tracks which ones already have integration coverage under the new structure.
 
 ## Current Snapshot
-- Channel exports: 50 request methods, 9 handler registration helpers, 9 unregister helpers.
+- Channel exports: 51 request-style methods (49 RPC-style operations + lifecycle connect/disconnect), 6 handler registration helpers, 6 unregister helpers. The prior `HandleErrorMessage` hook was removed.
 - Client/server helpers: 12 client methods, 10 server-manager methods, 6 auth mutators, 2 signing helpers.
-- Tests aligned to new SDK: **36 request methods / helpers** (public market data, session lifecycle, user-stream control, core user-data reads, spot trading order flows, SOR requests with graceful skips when unsupported), **6 / 9 event handlers** (channel-level error routing, event stream termination, order update, account update, balance update, list status); kline response handlers and external lock updates still pending.
+- Tests aligned to new SDK: **40 / 49 request operations** (public market data, session lifecycle, user-stream control, core user-data reads, primary order management, SOR flows) and **6 / 6 event handlers** (account update, balance update, order update, list status, external lock updates, event stream termination). Remaining gaps: commission/myFilters, open order-list views, and all `orderList*` requests.
 - Target suite layout: channel-focused tests mirroring `../spot-streams` (single `TestFullIntegrationSuite_Spot` with subtests per request + event).
 
 ## Client Entry Points
@@ -40,8 +40,8 @@ Refactor status: **in progress**. The SDK at `../../../../../../binance-go/ws/sp
 - [x] `ExchangeInfo`
 - [x] `AvgPrice`
 - [x] `Depth`
-- [x] `Klines` (`SendKlines` uses `HandleKlinesResponse`)
-- [x] `UiKlines` (`SendUiKlines` uses `HandleUiKlinesResponse`)
+- [x] `Klines`
+- [x] `UiKlines`
 - [x] `Ticker`
 - [x] `Ticker24hr`
 - [x] `TickerPrice`
@@ -63,8 +63,8 @@ Refactor status: **in progress**. The SDK at `../../../../../../binance-go/ws/sp
 - [ ] `OrderListPlaceOtoco`
 - [ ] `OrderListStatus`
 - [ ] `OrderListCancel`
-- [ ] `OrderAmendments`
-- [ ] `OrderAmendKeepPriority`
+- [x] `OrderAmendments`
+- [x] `OrderAmendKeepPriority`
 - [x] `SorOrderTest` *(skips when no SOR symbols available)*
 - [x] `SorOrderPlace` *(skips when no SOR symbols available)*
 - [x] `OpenOrdersCancelAll`
@@ -75,13 +75,12 @@ Refactor status: **in progress**. The SDK at `../../../../../../binance-go/ws/sp
 - [x] `AccountStatus`
 - [x] `AllOrderLists`
 - [x] `AllOrders`
+- [ ] `MyFilters`
 - [x] `MyTrades`
 - [x] `MyAllocations`
 - [x] `MyPreventedMatches`
 - [x] `OpenOrdersStatus`
 - [ ] `OpenOrderListsStatus`
-- [ ] `OrderAmendments` (also listed under Trading for TRADE)
-- [ ] `TradesRecent` (overlaps with market data but requires signature when `apiKey` present)
 
 ### Session & User Stream
 - [x] `SessionLogon` (Auth: SIGNED / Ed25519)
@@ -92,19 +91,12 @@ Refactor status: **in progress**. The SDK at `../../../../../../binance-go/ws/sp
 - [x] `UserDataStreamSubscribeSignature`
 - [x] `UserDataStreamUnsubscribe`
 
-### Miscellaneous Helpers
-- [x] `SpotChannel.SendKlines` (requires `HandleKlinesResponse`)
-- [x] `SpotChannel.SendUiKlines` (requires `HandleUiKlinesResponse`)
-
 ## SpotChannel Event Handlers
-- [x] `HandleErrorMessage` / `UnregisterErrorMessage`
-- [ ] `HandleKlinesResponse` / `UnregisterKlinesResponse`
-- [ ] `HandleUiKlinesResponse` / `UnregisterUiKlinesResponse`
 - [x] `HandleAccountUpdateEvent` / `UnregisterAccountUpdateEvent`
 - [x] `HandleBalanceUpdateEvent` / `UnregisterBalanceUpdateEvent`
 - [x] `HandleOrderUpdateEvent` / `UnregisterOrderUpdateEvent`
 - [x] `HandleListStatusEvent` / `UnregisterListStatusEvent`
-- [ ] `HandleExternalLockUpdateEvent` / `UnregisterExternalLockUpdateEvent`
+- [x] `HandleExternalLockUpdateEvent` / `UnregisterExternalLockUpdateEvent`
 - [x] `HandleEventStreamTerminatedEvent` / `UnregisterEventStreamTerminatedEvent`
 
 ## Utility Types (Models)
@@ -114,9 +106,9 @@ Refactor status: **in progress**. The SDK at `../../../../../../binance-go/ws/sp
 ## Coverage Plan
 1. Build `spot_channel_test.go` with an integration suite that connects once, reuses throttled helper calls, and records responses/events (pattern copied from `../spot-streams/market_channel_test.go`).
 2. Add shared helpers (signing, auth fixture loading, REST symbol discovery) in `integration_test.go` akin to `../spot-streams/integration_test.go`.
-3. Incrementally fill remaining gaps: trading order-list management, additional SOR permutations, and the remaining user-data event handlers (external lock) plus response handlers for klines.
+3. Incrementally fill remaining gaps: trading order-list management requests, `AccountCommission`, `MyFilters`, and read-only order-list views.
 
-_Updated: 2025-11-03 — public, session, user-stream, and core trading suites implemented; SOR flows now covered with graceful skips when unavailable; order-list management & additional user-data events still pending._
+_Updated: 2026-11-17 — refreshed for regenerated SDK, response handlers now include error parameter, and external lock events verified._
 - Authentication credentials must be configured via environment variables
 - Rate limiting is properly handled with appropriate delays
 - Tests include comprehensive error scenario coverage
@@ -130,7 +122,7 @@ This coverage document should be updated when:
 - API endpoints are deprecated or modified
 - Authentication methods are added or changed
 
-**Last Updated**: November 3, 2025 — added SOR discovery flow and ListStatus event validation
-**Test Coverage**: 36/50 request methods, 6/9 event handlers (excludes order-list management variants, kline responses, and external lock events)
+**Last Updated**: November 17, 2026 — synced with regenerated SDK and new handler signatures
+**Test Coverage**: 40/49 request operations, 6/6 event handlers (order-list workflows, commission stats, myFilters, and open order-list views pending)
 **Latest Test Results**: `go test -v ./...` *(SOR subtests skip automatically when no supported symbols are advertised; network access required for live execution.)*
 **Note**: `userDataStream.start` and `userDataStream.stop` remain deprecated in spot trading. Use `session.logon` with Ed25519 authentication and `userDataStream.subscribe` instead.

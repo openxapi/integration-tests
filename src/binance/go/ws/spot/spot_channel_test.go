@@ -3,7 +3,6 @@ package wstest
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -264,16 +263,37 @@ func (r *spotUserDataEventRecorder) lastTerminated() *models.EventStreamTerminat
 	return r.terminated[len(r.terminated)-1]
 }
 
-func newResponseHandler[T any](t testing.TB, label string) (*func(context.Context, *T) error, <-chan *T) {
+func newResponseHandler[T any](t testing.TB, label string) (*func(context.Context, *T, error) error, <-chan *T) {
 	t.Helper()
 	ch := make(chan *T, 1)
-	handler := func(ctx context.Context, resp *T) error {
+	handler := func(ctx context.Context, resp *T, err error) error {
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", label, err)
+			return nil
+		}
 		if resp == nil {
-			t.Errorf("%s: nil response", label)
+			t.Fatalf("%s: nil response", label)
 			return nil
 		}
 		select {
 		case ch <- resp:
+		default:
+		}
+		return nil
+	}
+	return &handler, ch
+}
+
+func newErrorResponseHandler[T any](t testing.TB, label string) (*func(context.Context, *T, error) error, <-chan error) {
+	t.Helper()
+	ch := make(chan error, 1)
+	handler := func(ctx context.Context, resp *T, err error) error {
+		if err == nil {
+			t.Fatalf("%s: expected error, got response %#v", label, resp)
+			return nil
+		}
+		select {
+		case ch <- err:
 		default:
 		}
 		return nil
@@ -288,6 +308,17 @@ func awaitResponse[T any](t testing.TB, ch <-chan *T, label string) *T {
 		return resp
 	case <-time.After(defaultRequestTimeout):
 		t.Fatalf("%s: timeout waiting for response", label)
+		return nil
+	}
+}
+
+func awaitError(t testing.TB, ch <-chan error, label string) error {
+	t.Helper()
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(defaultRequestTimeout):
+		t.Fatalf("%s: timeout waiting for error", label)
 		return nil
 	}
 }
@@ -674,55 +705,6 @@ func TestFullIntegrationSuite_Spot(t *testing.T) {
 	symbolLower := strings.ToLower(symbol)
 	exchangeSnapshot := &exchangeInfoSummary{}
 
-	type errorEnvelope struct {
-		Source  string
-		Message *models.ErrorMessage
-	}
-	errorCollector := make(chan errorEnvelope, 32)
-	reportError := func(source string, msg *models.ErrorMessage) {
-		if msg == nil {
-			return
-		}
-		select {
-		case errorCollector <- errorEnvelope{Source: source, Message: msg}:
-		default:
-			// drop oldest by draining one to keep channel non-blocking
-			select {
-			case <-errorCollector:
-			default:
-			}
-			errorCollector <- errorEnvelope{Source: source, Message: msg}
-		}
-	}
-
-	publicHarness.Channel.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error {
-		reportError(publicHarness.Config.Name, msg)
-		return nil
-	})
-	t.Cleanup(func() { publicHarness.Channel.UnregisterErrorMessage() })
-
-	if hmacHarness != nil {
-		hmacHarness.Channel.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error {
-			reportError(hmacHarness.Config.Name, msg)
-			return nil
-		})
-		t.Cleanup(func() { hmacHarness.Channel.UnregisterErrorMessage() })
-	}
-	if rsaHarness != nil {
-		rsaHarness.Channel.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error {
-			reportError(rsaHarness.Config.Name, msg)
-			return nil
-		})
-		t.Cleanup(func() { rsaHarness.Channel.UnregisterErrorMessage() })
-	}
-	if edHarness != nil {
-		edHarness.Channel.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error {
-			reportError(edHarness.Config.Name, msg)
-			return nil
-		})
-		t.Cleanup(func() { edHarness.Channel.UnregisterErrorMessage() })
-	}
-
 	t.Run("PublicRequests", func(t *testing.T) {
 		runPublicRequests(t, publicHarness, symbol, symbolLower, exchangeSnapshot)
 	})
@@ -786,19 +768,6 @@ func TestFullIntegrationSuite_Spot(t *testing.T) {
 		runUserDataEventHandlers(t, eventHarness, symbol)
 	})
 
-	// Log captured error messages for debugging context.
-	close(errorCollector)
-	var errorsSeen []errorEnvelope
-	for env := range errorCollector {
-		errorsSeen = append(errorsSeen, env)
-	}
-	if len(errorsSeen) > 0 {
-		for _, env := range errorsSeen {
-			data, _ := json.Marshal(env.Message)
-			t.Logf("errorMessage[%s]: %s", env.Source, string(data))
-		}
-		t.Fatalf("received %d error message(s) from server during test run", len(errorsSeen))
-	}
 }
 
 func runPublicRequests(t *testing.T, h *channelHarness, symbolUpper string, symbolLower string, info *exchangeInfoSummary) {
@@ -932,6 +901,37 @@ func runPublicRequests(t *testing.T, h *channelHarness, symbolUpper string, symb
 		}
 		if len(resp.Result.Bids) == 0 || len(resp.Result.Asks) == 0 {
 			t.Errorf("depth bids/asks empty (bids=%d asks=%d)", len(resp.Result.Bids), len(resp.Result.Asks))
+		}
+	})
+
+	t.Run("DepthInvalidSymbolError", func(t *testing.T) {
+		id := time.Now().UnixNano()
+		req := &models.DepthRequest{Id: models.NewMessageIDInt64(id)}
+		req.Params.Symbol = "INVALIDPAIR"
+		req.Params.Limit = 5
+		handler, errCh := newErrorResponseHandler[models.DepthResponse](t, "depth.error")
+		ctx, cancel := requestContext()
+		defer cancel()
+		throttleWS()
+		if err := h.Channel.Depth(ctx, req, handler); err != nil {
+			t.Fatalf("depth call failed: %v", err)
+		}
+		err := awaitError(t, errCh, "depth.error")
+		t.Logf("depth invalid symbol returned error: %v", err)
+		var apiErr *models.ErrorMessage
+		if !errors.As(err, &apiErr) {
+			t.Fatalf("depth error not ErrorMessage: %T %v", err, err)
+		}
+		if apiErr.Status == 0 {
+			t.Errorf("depth error status unset")
+		}
+		if apiErr.ErrorPayload.Code == 0 {
+			t.Errorf("depth error code unset")
+		}
+		if apiErr.ErrorPayload.Msg == "" {
+			t.Errorf("depth error message empty")
+		} else if !strings.Contains(strings.ToLower(apiErr.ErrorPayload.Msg), "symbol") {
+			t.Errorf("depth error message does not mention symbol: %q", apiErr.ErrorPayload.Msg)
 		}
 	})
 
