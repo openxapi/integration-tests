@@ -27,6 +27,7 @@ func signAndApply(t testing.TB, signer *spot.RequestSigner, authType spot.AuthTy
 	}
 	if target != nil {
 		applyAuthFields(t, target, params)
+		ensureAuthFieldsSynced(target, params)
 	}
 	return params
 }
@@ -55,8 +56,21 @@ func setStringField(structVal reflect.Value, field string, value interface{}) {
 	if value == nil {
 		return
 	}
-	if s, ok := value.(string); ok {
-		f.SetString(s)
+	switch v := value.(type) {
+	case string:
+		if v != "" {
+			f.SetString(v)
+		}
+	case fmt.Stringer:
+		s := v.String()
+		if s != "" {
+			f.SetString(s)
+		}
+	default:
+		s := fmt.Sprint(v)
+		if s != "" && s != "<nil>" {
+			f.SetString(s)
+		}
 	}
 }
 
@@ -94,4 +108,86 @@ func setInt64Field(structVal reflect.Value, field string, value interface{}) {
 			f.SetInt(parsed)
 		}
 	}
+}
+
+func ensureAuthFieldsSynced(target interface{}, params map[string]interface{}) {
+	if target == nil || params == nil {
+		return
+	}
+	val := reflect.ValueOf(target)
+	if val.Kind() != reflect.Ptr || val.IsNil() {
+		return
+	}
+	val = val.Elem()
+	if !val.IsValid() || val.Kind() != reflect.Struct {
+		return
+	}
+
+	if field := val.FieldByName("ApiKey"); field.IsValid() && field.CanSet() && field.Kind() == reflect.String && field.Len() == 0 {
+		if s := extractString(params["apiKey"]); s != "" {
+			field.SetString(s)
+		}
+	}
+	if field := val.FieldByName("Signature"); field.IsValid() && field.CanSet() && field.Kind() == reflect.String && field.Len() == 0 {
+		if s := extractString(params["signature"]); s != "" {
+			field.SetString(s)
+		}
+	}
+	if field := val.FieldByName("Timestamp"); field.IsValid() && field.CanSet() && (field.Kind() == reflect.Int64 || field.Kind() == reflect.Int || field.Kind() == reflect.Int32) && field.Int() == 0 {
+		if ts := extractInt64(params["timestamp"]); ts != 0 {
+			field.SetInt(ts)
+		}
+	}
+}
+
+func extractString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	switch s := v.(type) {
+	case string:
+		return s
+	case fmt.Stringer:
+		return s.String()
+	default:
+		str := fmt.Sprint(s)
+		if str == "<nil>" {
+			return ""
+		}
+		return str
+	}
+}
+
+func extractInt64(v interface{}) int64 {
+	if v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	case int32:
+		return int64(n)
+	case uint64:
+		return int64(n)
+	case uint:
+		return int64(n)
+	case uint32:
+		return int64(n)
+	case float64:
+		return int64(n)
+	case float32:
+		return int64(n)
+	case fmt.Stringer:
+		var parsed int64
+		if _, err := fmt.Sscan(n.String(), &parsed); err == nil {
+			return parsed
+		}
+	case string:
+		if parsed, err := strconv.ParseInt(n, 10, 64); err == nil {
+			return parsed
+		}
+	}
+	return 0
 }

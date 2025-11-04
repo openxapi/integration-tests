@@ -88,7 +88,7 @@ func loadCredentialStore() CredentialStore {
 				APIKey:         apiKey,
 				PrivateKeyPath: path,
 				PrivateKeyPass: strings.TrimSpace(os.Getenv("BINANCE_RSA_PRIVATE_KEY_PASSPHRASE")),
-				SupportsAuth:   []spot.AuthType{spot.AuthTypeUserData, spot.AuthTypeTrade, spot.AuthTypeSigned},
+				SupportsAuth:   []spot.AuthType{spot.AuthTypeUserData, spot.AuthTypeTrade, spot.AuthTypeSigned, spot.AuthTypeUserStream},
 			}
 		}
 	}
@@ -102,7 +102,7 @@ func loadCredentialStore() CredentialStore {
 				APIKey:         apiKey,
 				PrivateKeyPath: path,
 				PrivateKeyPass: strings.TrimSpace(os.Getenv("BINANCE_ED25519_PRIVATE_KEY_PASSPHRASE")),
-				SupportsAuth:   []spot.AuthType{spot.AuthTypeSigned},
+				SupportsAuth:   []spot.AuthType{spot.AuthTypeUserData, spot.AuthTypeTrade, spot.AuthTypeSigned, spot.AuthTypeUserStream},
 			}
 		}
 	}
