@@ -1,428 +1,311 @@
-package cmfutures_test
+package wstest
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/openxapi/binance-go/ws/cmfutures"
-	"github.com/openxapi/binance-go/ws/cmfutures/models"
-	"github.com/stretchr/testify/suite"
+	"github.com/gorilla/websocket"
+	cmfutures "github.com/openxapi/binance-go/ws/cmfutures"
 )
 
-// FullIntegrationTestSuite runs all integration tests together
-type FullIntegrationTestSuite struct {
-	suite.Suite
-	client *cmfutures.Client
-	auth   *cmfutures.Auth
-	ctx    context.Context
+const (
+	defaultConnectTimeout    = 12 * time.Second
+	defaultRequestTimeout    = 10 * time.Second
+	defaultDisconnectTimeout = 6 * time.Second
+	defaultTestnetServer     = "testnet"
+	overrideServerName       = "override"
+)
+
+// TestConfig describes one credential bundle that can be used against the WS API.
+type TestConfig struct {
+	Name           string
+	Description    string
+	KeyType        cmfutures.KeyType
+	APIKey         string
+	SecretKey      string
+	PrivateKeyPath string
+	PrivateKeyPass string
+	SupportsAuth   []cmfutures.AuthType
 }
 
-// TestFullIntegrationSuite is the main entry point for all tests
-func TestFullIntegrationSuite(t *testing.T) {
-	// Check if we have credentials
-	if testAPIKey == "" || testSecretKey == "" {
-		t.Skip("Skipping integration tests: BINANCE_API_KEY and BINANCE_SECRET_KEY not set")
+// CredentialStore lazily loads credential bundles from the environment.
+type CredentialStore struct {
+	Public  *TestConfig
+	HMAC    *TestConfig
+	RSA     *TestConfig
+	Ed25519 *TestConfig
+}
+
+var (
+	credsOnce sync.Once
+	creds     CredentialStore
+)
+
+func getCreds() CredentialStore {
+	credsOnce.Do(func() {
+		creds = loadCredentialStore()
+	})
+	return creds
+}
+
+func loadCredentialStore() CredentialStore {
+	store := CredentialStore{
+		Public: &TestConfig{
+			Name:        "Public-NoAuth",
+			Description: "Unauthenticated requests (session status/logout)",
+			SupportsAuth: []cmfutures.AuthType{
+				cmfutures.AuthTypeNone,
+			},
+		},
 	}
 
-	log.Println("🚀 === Starting Binance CMFUTURES WebSocket Integration Tests ===")
-	log.Printf("📊 Test Symbol: %s", testSymbol)
-	log.Printf("🌐 Server: testnet1 (testnet.binancefuture.com)")
-	log.Println("=================================================")
-
-	// Run individual test suites
-	suites := []struct {
-		name  string
-		suite suite.TestingSuite
-	}{
-		{"Account Tests", new(AccountTestSuite)},
-		{"Trading Tests", new(TradingTestSuite)},
-		{"User Data Stream Tests", new(UserDataTestSuite)},
-	}
-
-	allPassed := true
-	for _, s := range suites {
-		log.Printf("\n📋 --- Running %s ---", s.name)
-		// Use t.Run to properly run the suite
-		success := t.Run(s.name, func(t *testing.T) {
-			suite.Run(t, s.suite)
-		})
-		if !success {
-			allPassed = false
-		}
-		// Delay between test suites
-		time.Sleep(1 * time.Second)
-	}
-
-	// Run the comprehensive integration test if all individual suites passed
-	if allPassed {
-		log.Println("\n🎯 --- Running Comprehensive Integration Test ---")
-		suite.Run(t, new(FullIntegrationTestSuite))
-	} else {
-		t.Error("❌ Some test suites failed, skipping comprehensive integration test")
-	}
-
-	// Print test summary
-	log.Println("\n📊 === Test Summary ===")
-	log.Println("✅ All CMFUTURES WebSocket integration tests completed successfully!")
-	log.Println("🎉 100% API coverage achieved (10/10 APIs tested)")
-	log.Println("======================")
-}
-
-// SetupSuite runs before the test suite
-func (s *FullIntegrationTestSuite) SetupSuite() {
-	s.ctx = context.Background()
-
-	// Create auth
-	s.auth = cmfutures.NewAuth(testAPIKey)
-	s.auth.SetSecretKey(testSecretKey)
-	s.client = cmfutures.NewClientWithAuth(s.auth)
-
-	// Set testnet server
-	err := s.client.SetActiveServer("testnet1")
-	s.Require().NoError(err, "Failed to set testnet server")
-
-	// Connect to WebSocket
-	err = s.client.Connect(s.ctx)
-	s.Require().NoError(err, "Failed to connect to WebSocket")
-
-	// Allow connection to stabilize
-	time.Sleep(500 * time.Millisecond)
-
-	log.Println("Full integration test suite setup completed")
-}
-
-// TearDownSuite runs after the test suite
-func (s *FullIntegrationTestSuite) TearDownSuite() {
-	if s.client != nil && s.client.IsConnected() {
-		err := s.client.Disconnect()
-		if err != nil {
-			log.Printf("Error disconnecting client: %v", err)
-		}
-	}
-	log.Println("Full integration test suite teardown completed")
-}
-
-// TestComprehensiveWorkflow tests a complete trading workflow
-func (s *FullIntegrationTestSuite) TestComprehensiveWorkflow() {
-	log.Println("\n🔄 === Starting Comprehensive Workflow Test ===")
-
-	// Step 1: Check initial account status
-	s.Run("1_CheckAccountStatus", func() {
-		log.Println("📍 Step 1: Checking initial account status...")
-		s.checkAccountStatus()
-	})
-
-	// Step 2: Start user data stream
-	var listenKey string
-	s.Run("2_StartUserDataStream", func() {
-		log.Println("📡 Step 2: Starting user data stream...")
-		listenKey = s.startUserDataStream()
-		s.Require().NotEmpty(listenKey, "Listen key should not be empty")
-	})
-
-	// Step 3: Check account balance
-	s.Run("3_CheckAccountBalance", func() {
-		log.Println("💰 Step 3: Checking account balance...")
-		s.checkAccountBalance()
-	})
-
-	// Step 4: Check positions
-	s.Run("4_CheckPositions", func() {
-		log.Println("📈 Step 4: Checking account positions...")
-		s.checkAccountPositions()
-	})
-
-	// Step 5: Place a test order
-	var orderID int64
-	s.Run("5_PlaceOrder", func() {
-		log.Println("📝 Step 5: Placing a test order...")
-		orderID = s.placeOrder()
-		if orderID == 0 {
-			s.T().Skip("Failed to place order, skipping remaining steps")
-		}
-	})
-
-	// Step 6: Check order status
-	if orderID != 0 {
-		s.Run("6_CheckOrderStatus", func() {
-			log.Println("🔍 Step 6: Checking order status...")
-			s.checkOrderStatus(orderID)
-		})
-
-		// Step 7: Cancel the order
-		s.Run("7_CancelOrder", func() {
-			log.Println("❌ Step 7: Cancelling the order...")
-			s.cancelOrder(orderID)
-		})
-	}
-
-	// Step 8: Ping user data stream
-	if listenKey != "" {
-		s.Run("8_PingUserDataStream", func() {
-			log.Println("🏓 Step 8: Pinging user data stream...")
-			s.pingUserDataStream(listenKey)
-		})
-
-		// Step 9: Stop user data stream
-		s.Run("9_StopUserDataStream", func() {
-			log.Println("🛑 Step 9: Stopping user data stream...")
-			s.stopUserDataStream(listenKey)
-		})
-	}
-
-	// Step 10: Test comprehensive user data flow from UserDataTestSuite
-	s.Run("10_ComprehensiveUserDataFlow", func() {
-		log.Println("🔄 Step 10: Running comprehensive user data flow test...")
-		s.testComprehensiveUserDataFlow()
-	})
-
-	log.Println("\n✅ === Comprehensive Workflow Test Completed ===")
-}
-
-// Helper methods for comprehensive test
-
-func (s *FullIntegrationTestSuite) getAuthContext() context.Context {
-	authCtx, err := s.auth.ContextWithValue(s.ctx)
-	s.Require().NoError(err, "Failed to create auth context")
-	return authCtx
-}
-
-func (s *FullIntegrationTestSuite) checkAccountStatus() {
-	done := make(chan bool)
-	request := models.NewAccountStatusRequest()
-
-	err := s.client.SendAccountStatus(s.getAuthContext(), request, func(response *models.AccountStatusResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "Account status request failed")
-		s.Require().NotNil(response.Result)
-		
-		log.Printf("Account can trade: %v, can withdraw: %v, can deposit: %v",
-			response.Result.CanTrade, response.Result.CanWithdraw, response.Result.CanDeposit)
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
-}
-
-func (s *FullIntegrationTestSuite) checkAccountBalance() {
-	done := make(chan bool)
-	request := models.NewAccountBalanceRequest()
-
-	err := s.client.SendAccountBalance(s.getAuthContext(), request, func(response *models.AccountBalanceResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "Account balance request failed")
-		s.Require().NotNil(response.Result)
-		
-		if response.Result != nil {
-			log.Printf("Found %d asset balances", len(response.Result))
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
-}
-
-func (s *FullIntegrationTestSuite) checkAccountPositions() {
-	done := make(chan bool)
-	request := models.NewAccountPositionRequest()
-
-	err := s.client.SendAccountPosition(s.getAuthContext(), request, func(response *models.AccountPositionResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "Account position request failed")
-		s.Require().NotNil(response.Result)
-		
-		if response.Result != nil {
-			log.Printf("Found %d positions", len(response.Result))
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
-}
-
-func (s *FullIntegrationTestSuite) startUserDataStream() string {
-	done := make(chan bool)
-	var listenKey string
-	request := models.NewUserDataStreamStartRequest()
-
-	err := s.client.SendUserDataStreamStart(s.getAuthContext(), request, func(response *models.UserDataStreamStartResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "User data stream start failed")
-		s.Require().NotEmpty(response.Result.ListenKey)
-		
-		listenKey = response.Result.ListenKey
-		log.Printf("User data stream started with listen key: %s", listenKey)
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
-	return listenKey
-}
-
-func (s *FullIntegrationTestSuite) placeOrder() int64 {
-	done := make(chan bool)
-	var orderID int64
-	request := models.NewOrderPlaceRequest().
-		SetSymbol(testSymbol).
-		SetSide("BUY").
-		SetType("LIMIT").
-		SetQuantity(testOrderQuantity).
-		SetPrice("15000").
-		SetTimeInForce("GTC")
-
-	err := s.client.SendOrderPlace(s.getAuthContext(), request, func(response *models.OrderPlaceResponse, err error) error {
-		defer close(done)
-		if err != nil {
-			if apiErr, ok := cmfutures.IsAPIError(err); ok && apiErr.Code == -1013 {
-				log.Printf("Order placement failed due to MIN_NOTIONAL: %s", apiErr.Message)
-				return nil
+	if apiKey := strings.TrimSpace(os.Getenv("BINANCE_API_KEY")); apiKey != "" {
+		if secret := strings.TrimSpace(os.Getenv("BINANCE_SECRET_KEY")); secret != "" {
+			store.HMAC = &TestConfig{
+				Name:         "HMAC",
+				Description:  "Signed USER_DATA / TRADE requests via HMAC",
+				KeyType:      cmfutures.KeyTypeHMAC,
+				APIKey:       apiKey,
+				SecretKey:    secret,
+				SupportsAuth: []cmfutures.AuthType{cmfutures.AuthTypeUserData, cmfutures.AuthTypeTrade},
 			}
-			s.T().Errorf("Order placement failed: %v", err)
-			return err
 		}
-		
-		orderID = response.Result.OrderId
-		log.Printf("Order placed successfully - ID: %d", orderID)
-		return nil
-	})
+	}
 
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
-	return orderID
+	if apiKey := strings.TrimSpace(os.Getenv("BINANCE_RSA_API_KEY")); apiKey != "" {
+		if path := strings.TrimSpace(os.Getenv("BINANCE_RSA_PRIVATE_KEY_PATH")); path != "" {
+			store.RSA = &TestConfig{
+				Name:           "RSA",
+				Description:    "Signed requests via RSA private key",
+				KeyType:        cmfutures.KeyTypeRSA,
+				APIKey:         apiKey,
+				PrivateKeyPath: path,
+				PrivateKeyPass: strings.TrimSpace(os.Getenv("BINANCE_RSA_PRIVATE_KEY_PASSPHRASE")),
+				SupportsAuth:   []cmfutures.AuthType{cmfutures.AuthTypeUserData, cmfutures.AuthTypeTrade, cmfutures.AuthTypeSigned},
+			}
+		}
+	}
+
+	if apiKey := strings.TrimSpace(os.Getenv("BINANCE_ED25519_API_KEY")); apiKey != "" {
+		if path := strings.TrimSpace(os.Getenv("BINANCE_ED25519_PRIVATE_KEY_PATH")); path != "" {
+			store.Ed25519 = &TestConfig{
+				Name:           "Ed25519",
+				Description:    "Signed requests using Ed25519 (required for session.logon)",
+				KeyType:        cmfutures.KeyTypeED25519,
+				APIKey:         apiKey,
+				PrivateKeyPath: path,
+				PrivateKeyPass: strings.TrimSpace(os.Getenv("BINANCE_ED25519_PRIVATE_KEY_PASSPHRASE")),
+				SupportsAuth:   []cmfutures.AuthType{cmfutures.AuthTypeUserData, cmfutures.AuthTypeTrade, cmfutures.AuthTypeSigned},
+			}
+		}
+	}
+
+	return store
 }
 
-func (s *FullIntegrationTestSuite) checkOrderStatus(orderID int64) {
-	done := make(chan bool)
-	request := models.NewOrderStatusRequest().
-		SetSymbol(testSymbol).
-		SetOrderId(orderID)
-
-	err := s.client.SendOrderStatus(s.getAuthContext(), request, func(response *models.OrderStatusResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "Order status request failed")
-		
-		log.Printf("Order %d status: %s", orderID, response.Result.Status)
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
+func (cfg *TestConfig) supports(auth cmfutures.AuthType) bool {
+	if cfg == nil {
+		return false
+	}
+	if auth == cmfutures.AuthTypeNone {
+		return true
+	}
+	if cfg.APIKey == "" {
+		return false
+	}
+	if len(cfg.SupportsAuth) == 0 {
+		// Assume all signed flows if unspecified.
+		return true
+	}
+	for _, a := range cfg.SupportsAuth {
+		if a == auth {
+			return true
+		}
+	}
+	return false
 }
 
-func (s *FullIntegrationTestSuite) cancelOrder(orderID int64) {
-	done := make(chan bool)
-	request := models.NewOrderCancelRequest().
-		SetSymbol(testSymbol).
-		SetOrderId(orderID)
+// newClientAndSigner constructs a client (always switching to testnet unless overridden)
+// and returns an optional signer when credentials are available.
+func (cfg *TestConfig) newClientAndSigner(t testing.TB) (*cmfutures.Client, *cmfutures.RequestSigner) {
+	t.Helper()
+	if cfg == nil {
+		t.Fatalf("test configuration is required")
+	}
 
-	err := s.client.SendOrderCancel(s.getAuthContext(), request, func(response *models.OrderCancelResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "Order cancel request failed")
-		
-		log.Printf("Order %d cancelled successfully", orderID)
-		return nil
-	})
+	client := cmfutures.NewClient()
+	if err := ensureDefaultServer(client); err != nil {
+		t.Fatalf("failed to select WS server for %s: %v", cfg.Name, err)
+	}
 
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
+	if cfg.APIKey == "" {
+		return client, nil
+	}
+
+	auth := cmfutures.NewAuth(cfg.APIKey)
+	switch cfg.KeyType {
+	case cmfutures.KeyTypeHMAC:
+		if cfg.SecretKey == "" {
+			t.Skipf("skipping %s: BINANCE_SECRET_KEY not configured", cfg.Name)
+		}
+		auth.SetSecretKey(cfg.SecretKey)
+	case cmfutures.KeyTypeRSA, cmfutures.KeyTypeED25519:
+		if cfg.PrivateKeyPath == "" {
+			t.Skipf("skipping %s: private key path not configured", cfg.Name)
+		}
+		auth.SetPrivateKeyPath(cfg.PrivateKeyPath)
+		if cfg.PrivateKeyPass != "" {
+			auth.SetPassphrase(cfg.PrivateKeyPass)
+		}
+	default:
+		t.Fatalf("unsupported key type %q for config %s", cfg.KeyType, cfg.Name)
+	}
+
+	client.SetAuth(auth)
+	signer := cmfutures.NewRequestSigner(auth)
+	if err := signer.EnsureInitialized(); err != nil {
+		t.Skipf("credentials for %s are not usable: %v", cfg.Name, err)
+	}
+
+	return client, signer
 }
 
-func (s *FullIntegrationTestSuite) pingUserDataStream(listenKey string) {
-	done := make(chan bool)
-	request := models.NewUserDataStreamPingRequest()
-
-	err := s.client.SendUserDataStreamPing(s.getAuthContext(), request, func(response *models.UserDataStreamPingResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "User data stream ping failed")
-		
-		log.Printf("User data stream ping successful")
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
+// channelHarness bundles a client, signer, and channel for a specific credential set.
+type channelHarness struct {
+	Config  *TestConfig
+	Client  *cmfutures.Client
+	Signer  *cmfutures.RequestSigner
+	Channel *cmfutures.CmfuturesChannel
 }
 
-func (s *FullIntegrationTestSuite) stopUserDataStream(listenKey string) {
-	done := make(chan bool)
-	request := models.NewUserDataStreamStopRequest()
-
-	err := s.client.SendUserDataStreamStop(s.getAuthContext(), request, func(response *models.UserDataStreamStopResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "User data stream stop failed")
-		
-		log.Printf("User data stream stopped successfully")
-		return nil
-	})
-
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
-}
-
-func (s *FullIntegrationTestSuite) waitForResponse(done chan bool, timeout time.Duration) {
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		s.T().Error("Operation timed out")
+func newChannelHarness(t testing.TB, cfg *TestConfig) *channelHarness {
+	t.Helper()
+	client, signer := cfg.newClientAndSigner(t)
+	return &channelHarness{
+		Config:  cfg,
+		Client:  client,
+		Signer:  signer,
+		Channel: cmfutures.NewCmfuturesChannel(client),
 	}
 }
 
-func (s *FullIntegrationTestSuite) testComprehensiveUserDataFlow() {
-	log.Println("Starting comprehensive user data flow test...")
-
-	// 1. Start user data stream
-	listenKey := s.startUserDataStream()
-	s.Require().NotEmpty(listenKey, "Listen key should be set after start")
-
-	// 2. Query account balance
-	s.checkAccountBalance()
-
-	// 3. Query account position with specific pair
-	s.checkAccountPositionWithPair()
-
-	// 4. Query account status
-	s.checkAccountStatus()
-
-	// 5. Ping the stream
-	s.pingUserDataStream(listenKey)
-
-	// 6. Stop the stream
-	s.stopUserDataStream(listenKey)
-
-	log.Println("✅ Comprehensive user data flow completed successfully")
+func (h *channelHarness) connect(t testing.TB) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultConnectTimeout)
+	defer cancel()
+	if err := h.Channel.Connect(ctx); err != nil {
+		active := "<unknown>"
+		if info := h.Client.GetActiveServer(); info != nil && info.URL != "" {
+			active = info.URL
+		}
+		detailParts := []string{fmt.Sprintf("server=%s", active)}
+		if errors.Is(err, websocket.ErrBadHandshake) {
+			detailParts = append(detailParts, "handshake_err=websocket.ErrBadHandshake")
+		}
+		if chain := unwrapErrorChain(err); chain != "" {
+			detailParts = append(detailParts, fmt.Sprintf("error_chain=%s", chain))
+		}
+		if probe := probeHTTPContext(active); probe != "" {
+			detailParts = append(detailParts, probe)
+		}
+		t.Fatalf("connect %s failed: %v (%s)", h.Config.Name, err, strings.Join(detailParts, " "))
+	}
 }
 
-func (s *FullIntegrationTestSuite) checkAccountPositionWithPair() {
-	done := make(chan bool)
-	request := models.NewAccountPositionRequest().SetPair("BTCUSD")
+func (h *channelHarness) disconnect(t testing.TB) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDisconnectTimeout)
+	defer cancel()
+	if err := h.Channel.Disconnect(ctx); err != nil && !isContextCanceled(err) {
+		t.Errorf("disconnect %s: %v", h.Config.Name, err)
+	}
+}
 
-	err := s.client.SendAccountPosition(s.getAuthContext(), request, func(response *models.AccountPositionResponse, err error) error {
-		defer close(done)
-		s.Require().NoError(err, "Account position request failed")
-		s.Require().NotNil(response.Result)
-		
-		if response.Result != nil {
-			log.Printf("Found %d positions for BTCUSD pair", len(response.Result))
+func isContextCanceled(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+func ensureDefaultServer(client *cmfutures.Client) error {
+	if v := strings.TrimSpace(os.Getenv("BINANCE_CMFUTURES_WS_SERVER")); v != "" {
+		if err := client.AddOrUpdateServer(overrideServerName, v, "Override", "Test override server"); err != nil {
+			return fmt.Errorf("register override server: %w", err)
+		}
+		if err := client.SetActiveServer(overrideServerName); err != nil {
+			return fmt.Errorf("activate override server: %w", err)
 		}
 		return nil
-	})
+	}
+	if err := client.SetActiveServer(defaultTestnetServer); err != nil {
+		return fmt.Errorf("set active server %q: %w", defaultTestnetServer, err)
+	}
+	return nil
+}
 
-	s.Require().NoError(err)
-	s.waitForResponse(done, defaultTimeout)
-	time.Sleep(rateLimitDelay)
+func unwrapErrorChain(err error) string {
+	if err == nil {
+		return ""
+	}
+	seen := make(map[string]struct{})
+	var parts []string
+	for current := err; current != nil; current = errors.Unwrap(current) {
+		part := current.Error()
+		if _, ok := seen[part]; ok {
+			break
+		}
+		seen[part] = struct{}{}
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, " -> ")
+}
+
+func probeHTTPContext(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Sprintf("probe=parse_err:%v", err)
+	}
+	switch u.Scheme {
+	case "wss":
+		u.Scheme = "https"
+	case "ws":
+		u.Scheme = "http"
+	case "https", "http":
+	default:
+		return fmt.Sprintf("probe=unsupported_scheme:%s", u.Scheme)
+	}
+
+	probeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return fmt.Sprintf("probe=request_err:%v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		var netErr net.Error
+		if errors.As(err, &netErr) {
+			return fmt.Sprintf("probe=network_err:%v", netErr)
+		}
+		return fmt.Sprintf("probe=do_err:%v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	snippet := strings.TrimSpace(string(body))
+	if len(snippet) > 200 {
+		snippet = snippet[:200] + "..."
+	}
+	return fmt.Sprintf("probe_status=%d %s", resp.StatusCode, snippet)
 }

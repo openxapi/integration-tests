@@ -33,42 +33,32 @@ These tests validate the functionality of the Binance CMFUTURES WebSocket API SD
    source env.local
    ```
 
-4. Install dependencies:
+4. (Optional) Pre-fetch module dependencies if your environment has network access:
    ```bash
    go mod download
    ```
 
 ## Running Tests
 
-### Run all tests:
+### Run all tests
 ```bash
 go test -v ./...
 ```
 
-### Run specific test suites:
+### Run the full channel integration suite only
 ```bash
-# Account tests only
-go test -v -run TestAccount ./...
-
-# Trading tests only
-go test -v -run TestTrading ./...
-
-# User data stream tests only
-go test -v -run TestUserDataStream ./...
+go test -v -run TestFullIntegrationSuite_CmFutures ./...
 ```
 
-### Run full integration suite:
-```bash
-go test -v -run TestFullIntegrationSuite ./...
-```
+- The suite discovers a tradable symbol via the REST client and executes account, trading, and session RPC flows.
+- Ed25519 credentials are required to exercise `session.logon`; the subtest is skipped when keys are absent.
 
 ## Test Structure
 
-- `main_test.go` - Test setup and initialization
-- `account_test.go` - Account API tests (balance, position, status)
-- `trading_test.go` - Trading API tests (place, modify, cancel, status)
-- `userdata_test.go` - User data stream tests
-- `integration_test.go` - Full integration test suite
+- `integration_test.go` — shared harness for loading credentials, selecting the WS server, and wiring channel connections
+- `cmfutures_channel_test.go` — end-to-end coverage of account, trading, and session RPCs (mirrors the USD-M futures harness)
+- `rest_helpers_test.go` — REST helpers for exchange info, ticker discovery, and compliant limit order parameters
+- `assert_helpers_test.go`, `log_helpers_test.go`, `signing_helpers_test.go`, `timing_helpers_test.go` — utility functions shared across tests
 
 ## API Coverage
 
@@ -76,10 +66,10 @@ See [API_COVERAGE.md](./API_COVERAGE.md) for detailed API coverage information.
 
 ## Important Notes
 
-1. **Testnet Environment**: All tests run against the Binance testnet
-2. **Rate Limits**: Tests include delays to respect API rate limits
-3. **CMFUTURES Specific**: These tests are for Coin-M Futures (contracts settled in crypto)
-4. **No Public APIs**: Unlike SPOT/UMFUTURES, CMFUTURES WebSocket has no public data endpoints
+1. **Testnet Environment**: All tests target Binance Coin-M Futures testnet endpoints by default (override via `BINANCE_CMFUTURES_WS_SERVER` / `BINANCE_CMFUTURES_REST_SERVER`).
+2. **Rate Limits**: The harness throttles websocket calls (`WS_THROTTLE_MS`) and uses REST metadata to keep orders within exchange constraints.
+3. **CMFUTURES Specific**: The channel offers account, trading, and session RPCs only; no public market-data streams are exposed by the current spec.
+4. **Credentials**: HMAC keys are required for account/trading tests; Ed25519 keys are optional and only needed for `session.logon`.
 
 ## Troubleshooting
 
