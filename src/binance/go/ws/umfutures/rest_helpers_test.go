@@ -13,7 +13,10 @@ import (
 	restum "github.com/openxapi/binance-go/rest/umfutures"
 )
 
-const defaultUmFuturesRestTestnetServer = "https://testnet.binancefuture.com"
+const (
+	defaultUmFuturesRestTestnetServer = "https://testnet.binancefuture.com"
+	defaultFuturesOrderMinNotional    = 100.0
+)
 
 func newUmFuturesRESTClient() *restum.APIClient {
 	cfg := restum.NewConfiguration()
@@ -67,10 +70,16 @@ func loadFuturesSymbolConstraints(ctx context.Context, rc *restum.APIClient, sym
 	if entry == nil {
 		return nil, fmt.Errorf("symbol %s not found in exchangeInfo", symbol)
 	}
+	minNotional := defaultFuturesOrderMinNotional
+	if override := strings.TrimSpace(os.Getenv("BINANCE_UMFUTURES_MIN_NOTIONAL")); override != "" {
+		if v := parseFloat64(override); v > 0 {
+			minNotional = v
+		}
+	}
 	constraints := &futuresSymbolConstraints{
 		priceDecimals: int(entry.GetPricePrecision()),
 		qtyDecimals:   int(entry.GetQuantityPrecision()),
-		minNotional:   5.0,
+		minNotional:   minNotional,
 	}
 	for _, f := range entry.Filters {
 		if strings.EqualFold(f.GetFilterType(), "PRICE_FILTER") {
@@ -221,8 +230,10 @@ func prepareFuturesLimitOrderParams(ctx context.Context, rc *restum.APIClient, s
 		qty = ceilToStep(qty*multiplier, constraints.qtyStep, constraints.qtyDecimals)
 		targetNotional = qty * initialPrice
 	}
-	if targetNotional > 100.0 {
-		qty = ceilToStep(100.0/initialPrice, constraints.qtyStep, constraints.qtyDecimals)
+	notionalCap := math.Max(defaultFuturesOrderMinNotional, constraints.minNotional)
+	if notionalCap > 0 && targetNotional > notionalCap {
+		qty = ceilToStep(notionalCap/initialPrice, constraints.qtyStep, constraints.qtyDecimals)
+		targetNotional = qty * initialPrice
 	}
 	if qty <= 0 {
 		return nil, errors.New("failed to compute valid order quantity")

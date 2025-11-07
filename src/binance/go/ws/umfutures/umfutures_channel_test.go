@@ -37,20 +37,17 @@ func requestContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), defaultRequestTimeout)
 }
 
-func newResponseHandler[T any](t testing.TB, label string) (*func(context.Context, *T, error) error, <-chan *T) {
+type responseResult[T any] struct {
+	resp *T
+	err  error
+}
+
+func newResponseHandler[T any](t testing.TB) (*func(context.Context, *T, error) error, <-chan responseResult[T]) {
 	t.Helper()
-	ch := make(chan *T, 1)
+	ch := make(chan responseResult[T], 1)
 	handler := func(ctx context.Context, resp *T, err error) error {
-		if err != nil {
-			t.Fatalf("%s: unexpected error: %v", label, err)
-			return nil
-		}
-		if resp == nil {
-			t.Fatalf("%s: nil response", label)
-			return nil
-		}
 		select {
-		case ch <- resp:
+		case ch <- responseResult[T]{resp: resp, err: err}:
 		default:
 		}
 		return nil
@@ -75,12 +72,22 @@ func newErrorResponseHandler[T any](t testing.TB, label string) (*func(context.C
 	return &handler, ch
 }
 
-func awaitResponse[T any](t testing.TB, ch <-chan *T, label string) *T {
+func awaitResponse[T any](t testing.TB, ch <-chan responseResult[T], label string) *T {
 	t.Helper()
+	timer := time.NewTimer(defaultRequestTimeout)
+	defer timer.Stop()
 	select {
-	case resp := <-ch:
-		return resp
-	case <-time.After(defaultRequestTimeout):
+	case result := <-ch:
+		if result.err != nil {
+			t.Fatalf("%s: unexpected error: %v", label, result.err)
+			return nil
+		}
+		if result.resp == nil {
+			t.Fatalf("%s: nil response", label)
+			return nil
+		}
+		return result.resp
+	case <-timer.C:
 		t.Fatalf("%s: timeout waiting for response", label)
 		return nil
 	}
@@ -187,7 +194,7 @@ func runPublicRequests(t *testing.T, h *channelHarness, symbol string) {
 		}
 		req.Params.Symbol = symbol
 		logRequestOnFailure(t, "ticker.price.request", req)
-		handler, ch := newResponseHandler[models.TickerPriceResponse](t, "ticker.price.response")
+		handler, ch := newResponseHandler[models.TickerPriceResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -204,7 +211,7 @@ func runPublicRequests(t *testing.T, h *channelHarness, symbol string) {
 		}
 		req.Params.Symbol = symbol
 		logRequestOnFailure(t, "ticker.book.request", req)
-		handler, ch := newResponseHandler[models.TickerBookResponse](t, "ticker.book.response")
+		handler, ch := newResponseHandler[models.TickerBookResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -222,7 +229,7 @@ func runPublicRequests(t *testing.T, h *channelHarness, symbol string) {
 		req.Params.Symbol = symbol
 		req.Params.Limit = 20
 		logRequestOnFailure(t, "depth.request", req)
-		handler, ch := newResponseHandler[models.DepthResponse](t, "depth.response")
+		handler, ch := newResponseHandler[models.DepthResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -275,7 +282,7 @@ func runUserDataRequests(t *testing.T, h *channelHarness) {
 		params := map[string]interface{}{}
 		signAndApply(t, h.Signer, umfutures.AuthTypeUserData, params, &req.Params)
 		logRequestOnFailure(t, "account.balance.request", req)
-		handler, ch := newResponseHandler[models.AccountBalanceResponse](t, "account.balance.response")
+		handler, ch := newResponseHandler[models.AccountBalanceResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -291,7 +298,7 @@ func runUserDataRequests(t *testing.T, h *channelHarness) {
 		params := map[string]interface{}{}
 		signAndApply(t, h.Signer, umfutures.AuthTypeUserData, params, &req.Params)
 		logRequestOnFailure(t, "account.position.request", req)
-		handler, ch := newResponseHandler[models.AccountPositionResponse](t, "account.position.response")
+		handler, ch := newResponseHandler[models.AccountPositionResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -307,7 +314,7 @@ func runUserDataRequests(t *testing.T, h *channelHarness) {
 		params := map[string]interface{}{}
 		signAndApply(t, h.Signer, umfutures.AuthTypeUserData, params, &req.Params)
 		logRequestOnFailure(t, "account.status.request", req)
-		handler, ch := newResponseHandler[models.AccountStatusResponse](t, "account.status.response")
+		handler, ch := newResponseHandler[models.AccountStatusResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -323,7 +330,7 @@ func runUserDataRequests(t *testing.T, h *channelHarness) {
 		params := map[string]interface{}{}
 		signAndApply(t, h.Signer, umfutures.AuthTypeUserData, params, &req.Params)
 		logRequestOnFailure(t, "v2.account.balance.request", req)
-		handler, ch := newResponseHandler[models.V2AccountBalanceResponse](t, "v2.account.balance.response")
+		handler, ch := newResponseHandler[models.V2AccountBalanceResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -339,7 +346,7 @@ func runUserDataRequests(t *testing.T, h *channelHarness) {
 		params := map[string]interface{}{}
 		signAndApply(t, h.Signer, umfutures.AuthTypeUserData, params, &req.Params)
 		logRequestOnFailure(t, "v2.account.position.request", req)
-		handler, ch := newResponseHandler[models.V2AccountPositionResponse](t, "v2.account.position.response")
+		handler, ch := newResponseHandler[models.V2AccountPositionResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -355,7 +362,7 @@ func runUserDataRequests(t *testing.T, h *channelHarness) {
 		params := map[string]interface{}{}
 		signAndApply(t, h.Signer, umfutures.AuthTypeUserData, params, &req.Params)
 		logRequestOnFailure(t, "v2.account.status.request", req)
-		handler, ch := newResponseHandler[models.V2AccountStatusResponse](t, "v2.account.status.response")
+		handler, ch := newResponseHandler[models.V2AccountStatusResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -417,7 +424,7 @@ func runTradingRequests(t *testing.T, h *channelHarness, symbol string, rc *rest
 		}
 		signAndApply(t, h.Signer, umfutures.AuthTypeTrade, body, &req.Params)
 		logRequestOnFailure(t, "order.place.request", req)
-		handler, ch := newResponseHandler[models.OrderPlaceResponse](t, "order.place.response")
+		handler, ch := newResponseHandler[models.OrderPlaceResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -445,7 +452,7 @@ func runTradingRequests(t *testing.T, h *channelHarness, symbol string, rc *rest
 		}
 		signAndApply(t, h.Signer, umfutures.AuthTypeTrade, payload, &req.Params)
 		logRequestOnFailure(t, "order.status.request", req)
-		handler, ch := newResponseHandler[models.OrderStatusResponse](t, "order.status.response")
+		handler, ch := newResponseHandler[models.OrderStatusResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -477,7 +484,7 @@ func runTradingRequests(t *testing.T, h *channelHarness, symbol string, rc *rest
 		}
 		signAndApply(t, h.Signer, umfutures.AuthTypeTrade, payload, &req.Params)
 		logRequestOnFailure(t, "order.modify.request", req)
-		handler, ch := newResponseHandler[models.OrderModifyResponse](t, "order.modify.response")
+		handler, ch := newResponseHandler[models.OrderModifyResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -503,7 +510,7 @@ func runTradingRequests(t *testing.T, h *channelHarness, symbol string, rc *rest
 		}
 		signAndApply(t, h.Signer, umfutures.AuthTypeTrade, payload, &req.Params)
 		logRequestOnFailure(t, "order.cancel.request", req)
-		handler, ch := newResponseHandler[models.OrderCancelResponse](t, "order.cancel.response")
+		handler, ch := newResponseHandler[models.OrderCancelResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -579,7 +586,7 @@ func runSessionRequests(t *testing.T, public *channelHarness, hmac *channelHarne
 	t.Run("SessionStatus", func(t *testing.T) {
 		req := &models.SessionStatusRequest{Id: models.NewMessageIDInt64(time.Now().UnixNano())}
 		logRequestOnFailure(t, "session.status.request", req)
-		handler, ch := newResponseHandler[models.SessionStatusResponse](t, "session.status.response")
+		handler, ch := newResponseHandler[models.SessionStatusResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -593,7 +600,7 @@ func runSessionRequests(t *testing.T, public *channelHarness, hmac *channelHarne
 	t.Run("SessionLogout", func(t *testing.T) {
 		req := &models.SessionLogoutRequest{Id: models.NewMessageIDInt64(time.Now().UnixNano())}
 		logRequestOnFailure(t, "session.logout.request", req)
-		handler, ch := newResponseHandler[models.SessionLogoutResponse](t, "session.logout.response")
+		handler, ch := newResponseHandler[models.SessionLogoutResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
@@ -619,7 +626,7 @@ func runSessionRequests(t *testing.T, public *channelHarness, hmac *channelHarne
 		}
 		signAndApply(t, ed.Signer, umfutures.AuthTypeSigned, payload, &req.Params)
 		logRequestOnFailure(t, "session.logon.request", req)
-		handler, ch := newResponseHandler[models.SessionLogonResponse](t, "session.logon.response")
+		handler, ch := newResponseHandler[models.SessionLogonResponse](t)
 		ctx, cancel := requestContext()
 		defer cancel()
 		throttleWS()
