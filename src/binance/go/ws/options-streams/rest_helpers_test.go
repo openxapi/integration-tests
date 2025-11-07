@@ -191,3 +191,18 @@ func restTickerLast(ctx context.Context, symbol string) (float64, error) {
 	}
 	return strconv.ParseFloat(*resp[0].LastPrice, 64)
 }
+
+func restKlines(ctx context.Context, symbol, interval string, limit int32) ([]restoptions.GetKlinesV1RespItem, error) {
+	rc := newRESTClient()
+	cctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	req := rc.OptionsAPI.GetKlinesV1(cctx).Symbol(symbol).Interval(interval)
+	if limit > 0 {
+		req = req.Limit(limit)
+	}
+	resp, _, err := req.Execute()
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}

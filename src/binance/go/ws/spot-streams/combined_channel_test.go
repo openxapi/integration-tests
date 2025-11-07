@@ -74,7 +74,6 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// Channel and handlers
 	ch := spotstreams.NewCombinedMarketStreamChannel(stc.client)
 	rec := newSpotMarketEventRecorder()
-	ch.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { logJSON(t, "ws.error", msg); return nil })
 	ch.HandleCombinedMarketStreamEvent(func(ctx context.Context, ev *models.CombinedMarketStreamEvent) error { rec.addCombined(ev); return nil })
 
 	ch.HandleTradeEvent(func(ctx context.Context, ev *models.TradeEvent) error { rec.addTrade(ev); return nil })
@@ -93,7 +92,10 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	})
 	ch.HandleAllMiniTickersEvent(func(ctx context.Context, ev *models.AllMiniTickersEvent) error { rec.addAllMini(ev); return nil })
 	// Record single-symbol rolling window ticker events too
-	ch.HandleRollingWindowTickerEvent(func(ctx context.Context, ev *models.RollingWindowTickerEvent) error { rec.addRollingWindowTicker(ev); return nil })
+	ch.HandleRollingWindowTickerEvent(func(ctx context.Context, ev *models.RollingWindowTickerEvent) error {
+		rec.addRollingWindowTicker(ev)
+		return nil
+	})
 
 	// Compatibility hooks: the combined wrapper does not include an explicit 'e' field for
 	// bookTicker/partialDepth payloads; the client routes those by x-no-event-type keys.
@@ -142,7 +144,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		sid := time.Now().UnixMicro()
 		done := make(chan struct{}, 1)
 		var got *models.SubscribeResponse
-		var cb func(context.Context, *models.SubscribeResponse) error = func(ctx context.Context, resp *models.SubscribeResponse) error {
+		var cb func(context.Context, *models.SubscribeResponse, error) error = func(ctx context.Context, resp *models.SubscribeResponse, respErr error) error {
+			if respErr != nil {
+				t.Errorf("subscribe error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil subscribe response")
 				return nil
@@ -176,7 +182,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		lid := time.Now().UnixMicro()
 		done := make(chan struct{}, 1)
 		var got *models.ListSubscriptionsResponse
-		var cb func(context.Context, *models.ListSubscriptionsResponse) error = func(ctx context.Context, resp *models.ListSubscriptionsResponse) error {
+		var cb func(context.Context, *models.ListSubscriptionsResponse, error) error = func(ctx context.Context, resp *models.ListSubscriptionsResponse, respErr error) error {
+			if respErr != nil {
+				t.Errorf("listSubscriptions error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil listSubscriptions response")
 				return nil
@@ -212,7 +222,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		uid := time.Now().UnixMicro()
 		done := make(chan struct{}, 1)
 		var got *models.UnsubscribeResponse
-		var cb func(context.Context, *models.UnsubscribeResponse) error = func(ctx context.Context, resp *models.UnsubscribeResponse) error {
+		var cb func(context.Context, *models.UnsubscribeResponse, error) error = func(ctx context.Context, resp *models.UnsubscribeResponse, respErr error) error {
+			if respErr != nil {
+				t.Errorf("unsubscribe error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil unsubscribe response")
 				return nil
@@ -246,7 +260,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		pid := time.Now().UnixMicro()
 		done := make(chan struct{}, 1)
 		var got *models.SetPropertyResponse
-		var cb func(context.Context, *models.SetPropertyResponse) error = func(ctx context.Context, resp *models.SetPropertyResponse) error {
+		var cb func(context.Context, *models.SetPropertyResponse, error) error = func(ctx context.Context, resp *models.SetPropertyResponse, respErr error) error {
+			if respErr != nil {
+				t.Logf("setProperty callback error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil setProperty response")
 				return nil
@@ -288,7 +306,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		gid := time.Now().UnixMicro()
 		done := make(chan struct{}, 1)
 		var got *models.GetPropertyResponse
-		var cb func(context.Context, *models.GetPropertyResponse) error = func(ctx context.Context, resp *models.GetPropertyResponse) error {
+		var cb func(context.Context, *models.GetPropertyResponse, error) error = func(ctx context.Context, resp *models.GetPropertyResponse, respErr error) error {
+			if respErr != nil {
+				t.Logf("getProperty callback error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil getProperty response")
 				return nil
@@ -338,7 +360,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	t.Run("AggregateTradeEvent", func(t *testing.T) {
 		before := rec.count("aggTrade")
 		s, _ := spotstreams.BuildAggregateTradeEventStream(0, (spotstreams.AggregateTradeEventStreamParams{Symbol: models.Symbol(symLower)}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{s}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
 		}
@@ -358,12 +380,12 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 			_ = tryParseFloat(t, ev.Price, "price")
 			assertNonEmpty(t, ev.Symbol, "symbol")
 		}
-	cnt := rec.count("aggTrade")
-	if cnt > 0 {
-		t.Logf("aggTrade events received: %d", cnt)
-	} else {
-		t.Logf("aggTrade events received: %d", 0)
-	}
+		cnt := rec.count("aggTrade")
+		if cnt > 0 {
+			t.Logf("aggTrade events received: %d", cnt)
+		} else {
+			t.Logf("aggTrade events received: %d", 0)
+		}
 	})
 
 	// Combined wrapper event: expect stream and data set; count logged
@@ -385,7 +407,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// TradeEvent
 	t.Run("TradeEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildTradeEventStream(0, (spotstreams.TradeEventStreamParams{Symbol: models.Symbol(symLower)}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -409,7 +431,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// KlineEvent
 	t.Run("KlineEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildKlineEventStream(0, (spotstreams.KlineEventStreamParams{Symbol: models.Symbol(symLower), Interval: models.Interval("1m")}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -434,7 +456,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// TickerEvent
 	t.Run("TickerEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildTickerEventStream(0, (spotstreams.TickerEventStreamParams{Symbol: models.Symbol(symLower)}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -457,7 +479,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// MiniTickerEvent
 	t.Run("MiniTickerEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildMiniTickerEventStream(0, (spotstreams.MiniTickerEventStreamParams{Symbol: models.Symbol(symLower)}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -480,7 +502,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// BookTickerEvent
 	t.Run("BookTickerEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildBookTickerEventStream(0, (spotstreams.BookTickerEventStreamParams{Symbol: models.Symbol(symLower)}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -505,7 +527,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// AvgPriceEvent
 	t.Run("AvgPriceEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildAveragePriceEventStream(0, (spotstreams.AveragePriceEventStreamParams{Symbol: models.Symbol(symLower)}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -529,7 +551,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// PartialDepthEvent
 	t.Run("PartialDepthEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildPartialDepthEventStream(1, (spotstreams.PartialDepthEventStreamParams{Symbol: models.Symbol(symLower), Levels: models.DepthLevels5, Speed: models.DepthSpeed("100ms")}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -552,7 +574,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// DiffDepthEvent
 	t.Run("DiffDepthEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildDiffDepthEventStream(1, (spotstreams.DiffDepthEventStreamParams{Symbol: models.Symbol(symLower), Speed: models.DepthSpeed("100ms")}).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -571,7 +593,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// AllTickersEvent
 	t.Run("AllTickersEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildAllTickersEventStream(0, nil)
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -596,7 +618,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// AllMiniTickersEvent
 	t.Run("AllMiniTickersEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildAllMiniTickersEventStream(0, nil)
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -621,7 +643,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 	// AllRollingWindowTickersEvent
 	t.Run("AllRollingWindowTickersEvent", func(t *testing.T) {
 		path, _ := spotstreams.BuildAllRollingWindowTickersEventStream(0, map[string]string{"windowSize": "1h"})
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -642,8 +664,8 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 
 	// RollingWindowTickerEvent (single-symbol)
 	t.Run("RollingWindowTickerEvent", func(t *testing.T) {
-		path, _ := spotstreams.BuildRollingWindowTickerEventStream(0, (spotstreams.RollingWindowTickerEventStreamParams{Symbol: models.Symbol(symLower), WindowSize: models.WindowSize("1h")} ).Values())
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		path, _ := spotstreams.BuildRollingWindowTickerEventStream(0, (spotstreams.RollingWindowTickerEventStreamParams{Symbol: models.Symbol(symLower), WindowSize: models.WindowSize("1h")}).Values())
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)

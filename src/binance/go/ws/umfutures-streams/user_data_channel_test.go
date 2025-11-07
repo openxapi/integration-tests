@@ -227,6 +227,10 @@ func placeTestMarketOrder(t *testing.T, symbol string, side string, qty string) 
 	if err != nil {
 		return err
 	}
+	dualMode, derr := detectDualPositionMode(ctx, rc)
+	if derr != nil {
+		t.Logf("placeTestMarketOrder: position mode lookup failed: %v", derr)
+	}
 	ts := time.Now().UnixMilli()
 	req := rc.FuturesAPI.CreateOrderV1(ctx).
 		Symbol(symbol).
@@ -234,6 +238,13 @@ func placeTestMarketOrder(t *testing.T, symbol string, side string, qty string) 
 		Type_("MARKET").
 		Quantity(qty).
 		Timestamp(ts)
+	if dualMode {
+		posSide := "LONG"
+		if strings.EqualFold(side, "SELL") {
+			posSide = "SHORT"
+		}
+		req = req.PositionSide(posSide)
+	}
 	_, _, err = req.Execute()
 	if err == nil {
 		return nil
@@ -376,21 +387,24 @@ func closeAllPositions(t *testing.T) {
 			Side(task.side).
 			Type_("MARKET").
 			Quantity(task.qty).
-			ReduceOnly("true").
 			RecvWindow(5000).
 			Timestamp(time.Now().UnixMilli())
-		if task.posSide != "" && task.posSide != "BOTH" {
+		action := "reduce-only"
+		if task.posSide != "" && !strings.EqualFold(task.posSide, "BOTH") {
 			req = req.PositionSide(task.posSide)
+			action = "hedged"
+		} else {
+			req = req.ReduceOnly("true")
 		}
 		_, _, err := req.Execute()
 		if err != nil {
 			if ge, ok := err.(*restum.GenericOpenAPIError); ok {
-				t.Logf("closeAllPositions: reduce-only close failed for %s %s qty=%s: status=%s body=%s", task.symbol, task.side, task.qty, ge.Error(), string(ge.Body()))
+				t.Logf("closeAllPositions: %s close failed for %s %s qty=%s: status=%s body=%s", action, task.symbol, task.side, task.qty, ge.Error(), string(ge.Body()))
 			} else {
-				t.Logf("closeAllPositions: reduce-only close failed for %s %s qty=%s: %v", task.symbol, task.side, task.qty, err)
+				t.Logf("closeAllPositions: %s close failed for %s %s qty=%s: %v", action, task.symbol, task.side, task.qty, err)
 			}
 		} else {
-			t.Logf("closeAllPositions: submitted reduce-only %s %s qty=%s", task.symbol, task.side, task.qty)
+			t.Logf("closeAllPositions: submitted %s %s %s qty=%s", action, task.symbol, task.side, task.qty)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -412,6 +426,10 @@ func placeTestLimitOrder(t *testing.T, symbol string, side string, qty string, p
 	if err != nil {
 		return err
 	}
+	dualMode, derr := detectDualPositionMode(ctx, rc)
+	if derr != nil {
+		t.Logf("placeTestLimitOrder: position mode lookup failed: %v", derr)
+	}
 	ts := time.Now().UnixMilli()
 	req := rc.FuturesAPI.CreateOrderV1(ctx).
 		Symbol(symbol).
@@ -421,6 +439,13 @@ func placeTestLimitOrder(t *testing.T, symbol string, side string, qty string, p
 		Quantity(qty).
 		Price(priceStr).
 		Timestamp(ts)
+	if dualMode {
+		posSide := "LONG"
+		if strings.EqualFold(side, "SELL") {
+			posSide = "SHORT"
+		}
+		req = req.PositionSide(posSide)
+	}
 	_, _, err = req.Execute()
 	if err == nil {
 		return nil
@@ -461,11 +486,12 @@ func calcLimitOrderParams(ctx context.Context, rc *restum.APIClient, symbol stri
 	var qp, pp int32 = 3, 2
 	// Optional: pull tick/step sizes from filters to avoid -4014 (tick size) rejections
 	var (
-		priceStep float64
-		qtyStep   float64
-		minQty    float64
-		priceDecs int
-		qtyDecs   int
+		priceStep   float64
+		qtyStep     float64
+		minQty      float64
+		minNotional float64 = 5.0
+		priceDecs   int
+		qtyDecs     int
 	)
 	// helpers for robust rounding to step using integer math at given scale
 	floorToStep := func(value float64, step float64, decs int) float64 {
@@ -545,6 +571,12 @@ func calcLimitOrderParams(ctx context.Context, rc *restum.APIClient, symbol stri
 								if mq, _ := fm["minQty"].(string); mq != "" {
 									minQty = parseFloatSafe(mq)
 								}
+							case "MIN_NOTIONAL", "NOTIONAL":
+								if nt, _ := fm["notional"].(string); nt != "" {
+									if v := parseFloatSafe(nt); v > 0 {
+										minNotional = v
+									}
+								}
 							case "MARKET_LOT_SIZE":
 								// fallback step for quantity if LOT_SIZE absent
 								if qtyStep == 0 {
@@ -573,31 +605,69 @@ func calcLimitOrderParams(ctx context.Context, rc *restum.APIClient, symbol stri
 	if price <= 0 {
 		return "", "", fmt.Errorf("invalid rounded price")
 	}
-	// Ensure notional >= ~5 USDT while using quantity step and minQty
-	minNotional := 5.0
-	needQty := minNotional / price
-	q := needQty
+	// Ensure notional respects exchange filter (default to 5 if unavailable)
+	if minNotional <= 0 {
+		minNotional = 5.0
+	}
+	// Soft floor to avoid Binance -4164 rejections (requires >=100 notional on testnet)
+	const (
+		softFloorNotional = 110.0
+		hardCapNotional   = 400.0
+	)
+	targetNotional := math.Max(minNotional*1.2, softFloorNotional)
+	if targetNotional > hardCapNotional {
+		targetNotional = hardCapNotional
+	}
+	q := ceilToStep(targetNotional/price, qtyStep, qtyDecs)
+	if q <= 0 {
+		q = 1.0 / math.Pow10(qtyDecs)
+	}
 	// honor minQty if present
 	if minQty > 0 && q < minQty {
 		q = minQty
 	}
-	// ceil to the next quantity step
-	q = ceilToStep(q, qtyStep, qtyDecs)
-	// cap quantity to keep notional modest (avoid margin issues)
-	maxNotional := 20.0
-	if q*price > maxNotional {
-		// floor to step after capping target notional
-		target := maxNotional / price
+
+	// Ensure notional meets soft floor even after clamping
+	if q*price < softFloorNotional {
+		q = ceilToStep(softFloorNotional/price, qtyStep, qtyDecs)
+	}
+
+	// Clip to hard cap if we ended up above the safety limit
+	if q*price > hardCapNotional {
+		target := hardCapNotional / price
 		q = floorToStep(target, qtyStep, qtyDecs)
 		if q <= 0 {
-			// fallback to the minimal step unit by decimals
 			q = 1.0 / math.Pow10(qtyDecs)
 		}
+		// If clamping dropped us below the required floor, just accept the higher notional.
+		if q*price < softFloorNotional {
+			q = ceilToStep(softFloorNotional/price, qtyStep, qtyDecs)
+		}
 	}
+
 	// Final formatting
 	qtyStr = fmt.Sprintf("%.*f", qtyDecs, q)
 	priceStr = fmt.Sprintf("%.*f", priceDecs, price)
 	return qtyStr, priceStr, nil
+}
+
+// detectDualPositionMode returns true when the account is in dual (hedge) position mode.
+func detectDualPositionMode(ctx context.Context, rc *restum.APIClient) (bool, error) {
+	if ctx == nil {
+		return false, fmt.Errorf("position side query requires auth context")
+	}
+	ts := time.Now().UnixMilli()
+	resp, _, err := rc.FuturesAPI.GetPositionSideDualV1(ctx).Timestamp(ts).RecvWindow(5000).Execute()
+	if err != nil {
+		if ge, ok := err.(*restum.GenericOpenAPIError); ok {
+			return false, fmt.Errorf("position side query failed: status=%s body=%s", ge.Error(), string(ge.Body()))
+		}
+		return false, err
+	}
+	if resp == nil || resp.DualSidePosition == nil {
+		return false, fmt.Errorf("position side query: missing dualSidePosition")
+	}
+	return *resp.DualSidePosition, nil
 }
 
 // togglePositionMode flips dual-side position to trigger ACCOUNT_CONFIG_UPDATE
@@ -688,11 +758,6 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 	// Channel + handlers
 	ch := umfuturesstreams.NewUserDataStreamChannel(stc.client)
 	rec := newUMUserDataEventRecorder()
-	ch.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error {
-		rec.addError(msg)
-		logJSON(t, "ws.error", msg)
-		return nil
-	})
 	ch.HandleListenKeyExpiredEvent(func(ctx context.Context, ev *models.ListenKeyExpiredEvent) error { rec.addExpired(ev); return nil })
 	ch.HandleAccountUpdateEvent(func(ctx context.Context, ev *models.AccountUpdateEvent) error { rec.addAcctUpd(ev); return nil })
 	ch.HandleMarginCallEvent(func(ctx context.Context, ev *models.MarginCallEvent) error { rec.addMarginCal(ev); return nil })
@@ -728,7 +793,16 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 		sid := newMessageID()
 		done := make(chan struct{}, 1)
 		var got *models.UserDataStreamStartResponse
-		cb := func(ctx context.Context, resp *models.UserDataStreamStartResponse) error {
+		cb := func(ctx context.Context, resp *models.UserDataStreamStartResponse, rpcErr error) error {
+			if rpcErr != nil {
+				if em, ok := rpcErr.(*models.ErrorMessage); ok {
+					rec.addError(em)
+					logJSON(t, "userData.start.error", em)
+				} else {
+					t.Logf("userData.start rpc error: %v", rpcErr)
+				}
+				return nil
+			}
 			got = resp
 			logJSON(t, "userData.start.response", resp)
 			select {
@@ -759,7 +833,16 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 		pid := newMessageID()
 		done := make(chan struct{}, 1)
 		var got *models.UserDataStreamPingResponse
-		cb := func(ctx context.Context, resp *models.UserDataStreamPingResponse) error {
+		cb := func(ctx context.Context, resp *models.UserDataStreamPingResponse, rpcErr error) error {
+			if rpcErr != nil {
+				if em, ok := rpcErr.(*models.ErrorMessage); ok {
+					rec.addError(em)
+					logJSON(t, "userData.ping.error", em)
+				} else {
+					t.Logf("userData.ping rpc error: %v", rpcErr)
+				}
+				return nil
+			}
 			got = resp
 			logJSON(t, "userData.ping.response", resp)
 			select {
@@ -790,7 +873,16 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 		sid := newMessageID()
 		done := make(chan struct{}, 1)
 		var got *models.UserDataStreamStopResponse
-		cb := func(ctx context.Context, resp *models.UserDataStreamStopResponse) error {
+		cb := func(ctx context.Context, resp *models.UserDataStreamStopResponse, rpcErr error) error {
+			if rpcErr != nil {
+				if em, ok := rpcErr.(*models.ErrorMessage); ok {
+					rec.addError(em)
+					logJSON(t, "userData.stop.error", em)
+				} else {
+					t.Logf("userData.stop rpc error: %v", rpcErr)
+				}
+				return nil
+			}
 			got = resp
 			logJSON(t, "userData.stop.response", resp)
 			select {
@@ -1161,10 +1253,10 @@ func TestFullIntegrationSuite_UserData(t *testing.T) {
 		t.Logf("error messages captured: %d", cnt)
 		if cnt > 0 {
 			msg := rec.errors[len(rec.errors)-1]
-			if msg.Error.Code == 0 {
-				t.Logf("error code missing")
+			if msg.ErrorPayload.Code == 0 {
+				t.Logf("error code missing (message=%s)", msg.Error())
 			}
-			assertNonEmpty(t, msg.Error.Msg, "error.msg")
+			assertNonEmpty(t, msg.ErrorPayload.Msg, "error.msg")
 		}
 	})
 

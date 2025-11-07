@@ -65,7 +65,6 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 
 	// Channel and handlers
 	ch := umfuturesstreams.NewCombinedMarketStreamChannel(stc.client)
-	ch.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { logJSON(t, "ws.error", msg); return nil })
 	// wrapper handler to mark combined messages as handled
 	ch.HandleCombinedMarketStreamEvent(func(ctx context.Context, ev *models.CombinedMarketStreamEvent) error { return nil })
 	// Record events from suite start
@@ -135,7 +134,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		}
 		sid := newMessageID()
 		subDone := make(chan struct{}, 1)
-		subCb := func(ctx context.Context, resp *models.SubscribeResponse) error {
+		subCb := func(ctx context.Context, resp *models.SubscribeResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Errorf("subscribe error: %v", rpcErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil subscribe response")
 				return nil
@@ -166,11 +169,15 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build kline stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeSetup")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		lid := newMessageID()
 		done := make(chan struct{}, 1)
-		lsCb := func(ctx context.Context, resp *models.ListSubscriptionsResponse) error {
+		lsCb := func(ctx context.Context, resp *models.ListSubscriptionsResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Errorf("list subscriptions error: %v", rpcErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil list subscriptions response")
 				return nil
@@ -200,7 +207,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 
 	t.Run("Request_SetProperty", func(t *testing.T) {
 		pid := newMessageID()
-		setCb := func(ctx context.Context, resp *models.SetPropertyResponse) error {
+		setCb := func(ctx context.Context, resp *models.SetPropertyResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Logf("setProperty rpc error: %v", rpcErr)
+				return nil
+			}
 			logJSON(t, "setProperty.response", resp)
 			return nil
 		}
@@ -220,7 +231,11 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 
 	t.Run("Request_GetProperty", func(t *testing.T) {
 		gid := newMessageID()
-		getCb := func(ctx context.Context, resp *models.GetPropertyResponse) error {
+		getCb := func(ctx context.Context, resp *models.GetPropertyResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Logf("getProperty rpc error: %v", rpcErr)
+				return nil
+			}
 			logJSON(t, "getProperty.response", resp)
 			return nil
 		}
@@ -239,7 +254,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build aggTrade stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		deadline := time.Now().Add(eventWait())
 		for time.Now().Before(deadline) {
@@ -267,7 +282,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build markPrice stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		deadline := time.Now().Add(eventWait())
 		for time.Now().Before(deadline) {
@@ -296,7 +311,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build kline stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		deadline := time.Now().Add(eventWait())
 		for time.Now().Before(deadline) {
@@ -325,7 +340,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build miniTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		deadline := time.Now().Add(eventWait())
 		for time.Now().Before(deadline) {
@@ -348,7 +363,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build bookTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		deadline := time.Now().Add(eventWait())
 		for time.Now().Before(deadline) {
@@ -371,7 +386,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build partialDepth stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		deadline := time.Now().Add(eventWait())
 		for time.Now().Before(deadline) {
@@ -394,7 +409,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build diffDepth stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		deadline := time.Now().Add(eventWait())
 		for time.Now().Before(deadline) {
@@ -415,7 +430,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allTickers stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("allTickers", 1, eventWait())
 		cnt := rec.count("allTickers")
@@ -436,7 +451,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allMiniTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("allMiniTickers", 1, eventWait())
 		cnt := rec.count("allMiniTickers")
@@ -456,7 +471,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allBookTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("allBookTickers", 1, eventWait())
 		cnt := rec.count("allBookTickers")
@@ -474,7 +489,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allMarkPrices stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("allMarkPrices", 1, eventWait())
 		cnt := rec.count("allMarkPrices")
@@ -495,7 +510,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build liquidation stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("liquidation", 1, eventWait())
 		cnt := rec.count("liquidation")
@@ -527,7 +542,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allLiquidations stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("allLiquidations", 1, eventWait())
 		cnt := rec.count("allLiquidations")
@@ -560,7 +575,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build compositeIndex stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("compositeIndex", 1, eventWait())
 		cnt := rec.count("compositeIndex")
@@ -575,7 +590,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build contractInfo stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		// Not very frequent; tolerate missing
 		_ = rec.waitForMin("assetIndex", 0, 100*time.Millisecond)
@@ -586,7 +601,7 @@ func TestFullIntegrationSuite_Combined(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allAssetIndex stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = ch.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{stream}}, &subCb)
 		_ = rec.waitForMin("allAssetIndexes", 1, eventWait())
 		cnt := rec.count("allAssetIndexes")

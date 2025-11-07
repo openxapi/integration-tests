@@ -92,6 +92,21 @@ func optionUnderlying(symbol string) string {
 	return symbol
 }
 
+func tryParseInt64(t *testing.T, v string, name string) int64 {
+	t.Helper()
+	v = strings.TrimSpace(v)
+	if v == "" {
+		t.Errorf("%s empty string", name)
+		return 0
+	}
+	i, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		t.Errorf("%s parse int64: %v (value=%q)", name, err, v)
+		return 0
+	}
+	return i
+}
+
 func assertMessageIDInt64(t *testing.T, id models.MessageID, want int64, label string) {
 	t.Helper()
 	got, ok := id.ValInt64()

@@ -4,7 +4,7 @@ SDK: `github.com/openxapi/binance-go/ws/umfutures-streams`
 REST: `github.com/openxapi/binance-go/rest/umfutures`
 
 Notes
-- Request methods accept a per-request callback pointer (e.g., `*func(context.Context, *models.SubscribeResponse) error`). Tests pass concrete callbacks and assert ids/fields where ACKs are returned. Some property methods may not ACK on all servers; timeouts are tolerated when reasonable.
+- Request methods accept a per-request callback pointer (e.g., `*func(context.Context, *models.SubscribeResponse, error) error`). Tests pass concrete callbacks, assert ids/fields where ACKs are returned, and log any RPC errors surfaced via the `error` argument (typically `*models.ErrorMessage`). Some property methods may not ACK on all servers; timeouts are tolerated when reasonable.
 - One IntegrationTestSuite per channel: Market, Combined. Field-level assertions are performed for each event type where market activity exists.
 - For Market and Combined suites we force `mainnet1` to increase event availability; default behavior remains testnet for other tests.
 
@@ -36,7 +36,7 @@ Market Streams (type `MarketStreamsChannel`, key: `marketStreams`)
 - [x] ListSubscriptions(ctx, req, cb)
 - [x] SetProperty(ctx, req, cb) (timeout tolerated)
 - [x] GetProperty(ctx, req, cb) (optional ACK)
-- [x] HandleAggregateTradeEvent / HandleMarkPriceEvent / HandleKlineEvent / HandleTickerEvent / HandleBookTickerEvent / HandlePartialDepthEvent / HandleDiffDepthEvent / HandleErrorMessage
+- [x] HandleAggregateTradeEvent / HandleMarkPriceEvent / HandleKlineEvent / HandleTickerEvent / HandleBookTickerEvent / HandlePartialDepthEvent / HandleDiffDepthEvent
 
 Combined Market Streams (type `CombinedMarketStreamsChannel`, key: `combinedMarketStreams`)
 - [x] NewCombinedMarketStreamsChannel(client *Client) *CombinedMarketStreamsChannel
@@ -48,7 +48,6 @@ Combined Market Streams (type `CombinedMarketStreamsChannel`, key: `combinedMark
 - [x] GetProperty(ctx, req, cb) (optional ACK)
 - Handlers (Complete List):
   - [x] HandleCombinedMarketStreamsEvent (wrapper)
-  - [x] HandleErrorMessage
   - [x] HandleAggregateTradeEvent
   - [x] HandleMarkPriceEvent
   - [x] HandleAllMarkPricesEvent
@@ -70,7 +69,6 @@ Combined Market Streams (type `CombinedMarketStreamsChannel`, key: `combinedMark
   - [x] HandleAllAssetIndexesEvent
 
 Handlers By Channel (MarketStreamsChannel)
-- [x] HandleErrorMessage
 - [x] HandleAggregateTradeEvent
 - [x] HandleMarkPriceEvent
 - [x] HandleAllMarkPricesEvent

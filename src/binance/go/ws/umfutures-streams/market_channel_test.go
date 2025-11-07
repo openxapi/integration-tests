@@ -251,7 +251,6 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 	market := umfuturesstreams.NewMarketStreamChannel(stc.client)
 	// Record events from the start of the suite
 	rec := newUMMarketEventRecorder()
-	market.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { logJSON(t, "ws.error", msg); return nil })
 	// Register all event handlers at suite start and record
 	market.HandleAggregateTradeEvent(func(ctx context.Context, ev *models.AggregateTradeEvent) error { rec.addAgg(ev); return nil })
 	market.HandleMarkPriceEvent(func(ctx context.Context, ev *models.MarkPriceEvent) error { rec.addMark(ev); return nil })
@@ -316,7 +315,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		sid := newMessageID()
 		subDone := make(chan struct{}, 1)
 		var gotSub *models.SubscribeResponse
-		subCb := func(ctx context.Context, resp *models.SubscribeResponse) error {
+		subCb := func(ctx context.Context, resp *models.SubscribeResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Errorf("subscribe error: %v", rpcErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil subscribe response")
 				return nil
@@ -345,7 +348,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("did not capture subscribe response")
 		}
 		// Cleanup to avoid noise
-		var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		unsubCb := ackLogger[models.UnsubscribeResponse](t, t.Name()+".unsubscribeCleanup")
 		_ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: newMessageID(), Params: []string{markPath}}, &unsubCb)
 	})
 
@@ -356,12 +359,16 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("build aggTrade stream: %v", err)
 		}
 		// Subscribe first so list has at least one entry
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeSetup")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{aggPath}}, &subCb)
 		lid := newMessageID()
 		listDone := make(chan struct{}, 1)
 		var got *models.ListSubscriptionsResponse
-		listCb := func(ctx context.Context, resp *models.ListSubscriptionsResponse) error {
+		listCb := func(ctx context.Context, resp *models.ListSubscriptionsResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Errorf("list subscriptions error: %v", rpcErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil list subscriptions response")
 				return nil
@@ -392,7 +399,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 			t.Fatalf("did not capture listSubscriptions response")
 		}
 		// Cleanup
-		var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		unsubCb := ackLogger[models.UnsubscribeResponse](t, t.Name()+".unsubscribeCleanup")
 		_ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: newMessageID(), Params: []string{aggPath}}, &unsubCb)
 	})
 
@@ -401,7 +408,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		pid := newMessageID()
 		setDone := make(chan struct{}, 1)
 		var gotSet *models.SetPropertyResponse
-		setCb := func(ctx context.Context, resp *models.SetPropertyResponse) error {
+		setCb := func(ctx context.Context, resp *models.SetPropertyResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Errorf("setProperty error: %v", rpcErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil setProperty response")
 				return nil
@@ -443,7 +454,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		gid := newMessageID()
 		getDone := make(chan struct{}, 1)
 		var gotGet *models.GetPropertyResponse
-		getCb := func(ctx context.Context, resp *models.GetPropertyResponse) error {
+		getCb := func(ctx context.Context, resp *models.GetPropertyResponse, rpcErr error) error {
+			if rpcErr != nil {
+				t.Logf("getProperty rpc error: %v", rpcErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil getProperty response")
 				return nil
@@ -479,7 +494,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build aggTrade stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("aggTrade", 1, eventWait())
 		cnt := rec.count("aggTrade")
@@ -504,7 +519,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build markPrice stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("markPrice", 1, eventWait())
 		cnt := rec.count("markPrice")
@@ -543,7 +558,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build kline stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("kline", 1, eventWait())
 		cnt := rec.count("kline")
@@ -568,7 +583,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build ticker stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("ticker", 1, eventWait())
 		cnt := rec.count("ticker")
@@ -593,7 +608,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build miniTicker stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("miniTicker", 1, eventWait())
 		cnt := rec.count("miniTicker")
@@ -618,7 +633,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build bookTicker stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("bookTicker", 1, eventWait())
 		cnt := rec.count("bookTicker")
@@ -644,7 +659,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build liquidation stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("liquidation", 1, eventWait())
 		cnt := rec.count("liquidation")
@@ -677,7 +692,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build partial depth stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("partialDepth", 1, eventWait())
 		cnt := rec.count("partialDepth")
@@ -698,7 +713,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allMarkPrices stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("allMarkPrices", 1, eventWait())
 		cnt := rec.count("allMarkPrices")
@@ -715,7 +730,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		} else {
 			t.Logf("no allMarkPrices event received (acceptable)")
 		}
-		var unsub func(context.Context, *models.UnsubscribeResponse) error = func(context.Context, *models.UnsubscribeResponse) error { return nil }
+		unsub := ackLogger[models.UnsubscribeResponse](t, t.Name()+".unsubscribeCleanup")
 		_ = market.Unsubscribe(context.Background(), &models.UnsubscribeRequest{Id: newMessageID(), Params: []string{path}}, &unsub)
 	})
 
@@ -724,7 +739,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allMiniTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("allMiniTickers", 1, eventWait())
 		cnt := rec.count("allMiniTickers")
@@ -739,7 +754,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allTickers stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("allTickers", 1, eventWait())
 		cnt := rec.count("allTickers")
@@ -754,7 +769,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allBookTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("allBookTickers", 1, eventWait())
 		cnt := rec.count("allBookTickers")
@@ -769,7 +784,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allLiquidations stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("allLiquidations", 1, eventWait())
 		cnt := rec.count("allLiquidations")
@@ -802,7 +817,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build compositeIndex stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("compositeIndex", 1, eventWait())
 		cnt := rec.count("compositeIndex")
@@ -819,7 +834,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build assetIndex stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("assetIndex", 1, eventWait())
 		cnt := rec.count("assetIndex")
@@ -834,7 +849,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build allAssetIndex stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("allAssetIndexes", 1, eventWait())
 		cnt := rec.count("allAssetIndexes")
@@ -850,7 +865,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build continuousKline stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := ackLogger[models.SubscribeResponse](t, t.Name()+".subscribeAck")
 		_ = market.Subscribe(context.Background(), &models.SubscribeRequest{Id: newMessageID(), Params: []string{path}}, &subCb)
 		_ = rec.waitForMin("continuousKline", 1, eventWait())
 		cnt := rec.count("continuousKline")

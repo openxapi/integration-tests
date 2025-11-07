@@ -4,7 +4,7 @@ SDK: `github.com/openxapi/binance-go/ws/options-streams`
 REST: `github.com/openxapi/binance-go/rest/options`
 
 Notes
-- Request methods accept a third argument: pointer to per‑request callback (e.g., `*func(context.Context, *models.SubscribeResponse) error`). Tests pass concrete callbacks and assert ids/fields.
+- Request methods accept a third argument: pointer to per‑request callback (e.g., `*func(context.Context, *models.SubscribeResponse, error) error`). Tests pass concrete callbacks, assert ids/fields, and treat error payloads as first‑class.
 - One IntegrationTestSuite per channel: Market, Combined, User Data. Field‑level assertions are performed for each event type where market activity exists.
 
 Coverage Summary
@@ -82,11 +82,11 @@ Market Streams (type `MarketStreamChannel`, key: `marketStream`)
 - [x] NewMarketStreamChannel(client *Client) *MarketStreamChannel
 - [x] Connect(ctx context.Context, streamName string) error
 - [x] Disconnect(ctx context.Context) error
-- [x] Subscribe(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscribeResponse) error) error
-- [x] Unsubscribe(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscribeResponse) error) error
-- [x] ListSubscriptions(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
-- [x] SetProperty(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
-- [x] GetProperty(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
+- [x] Subscribe(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscribeResponse, error) error) error
+- [x] Unsubscribe(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscribeResponse, error) error) error
+- [x] ListSubscriptions(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse, error) error) error
+- [x] SetProperty(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse, error) error) error
+- [x] GetProperty(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse, error) error) error
 - [x] HandleNewSymbolInfoEvent(fn func(context.Context, *models.NewSymbolInfoEvent) error)
 - [x] HandleOpenInterestEvent(fn func(context.Context, *models.OpenInterestEvent) error)
 - [x] HandleMarkPriceEvent(fn func(context.Context, *models.MarkPriceEvent) error)
@@ -96,19 +96,17 @@ Market Streams (type `MarketStreamChannel`, key: `marketStream`)
 - [x] HandleTickerEvent(fn func(context.Context, *models.TickerEvent) error)
 - [x] HandleTradeEvent(fn func(context.Context, *models.TradeEvent) error)
 - [x] HandlePartialDepthEvent(fn func(context.Context, *models.PartialDepthEvent) error)
-- [x] HandleErrorMessage(fn func(context.Context, *models.ErrorMessage) error)
 
 Combined Market Streams (type `CombinedMarketStreamChannel`, key: `combinedMarketStream`)
 - [x] NewCombinedMarketStreamChannel(client *Client) *CombinedMarketStreamChannel
 - [x] Connect(ctx context.Context, streams string) error
 - [x] Disconnect(ctx context.Context) error
-- [x] Subscribe(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscribeResponse) error) error
-- [x] Unsubscribe(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscribeResponse) error) error
-- [x] ListSubscriptions(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse) error) error
-- [x] SetProperty(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse) error) error
-- [x] GetProperty(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse) error) error
+- [x] Subscribe(ctx context.Context, req *models.SubscribeRequest, cb *func(context.Context, *models.SubscribeResponse, error) error) error
+- [x] Unsubscribe(ctx context.Context, req *models.UnsubscribeRequest, cb *func(context.Context, *models.UnsubscribeResponse, error) error) error
+- [x] ListSubscriptions(ctx context.Context, req *models.ListSubscriptionsRequest, cb *func(context.Context, *models.ListSubscriptionsResponse, error) error) error
+- [x] SetProperty(ctx context.Context, req *models.SetPropertyRequest, cb *func(context.Context, *models.SetPropertyResponse, error) error) error
+- [x] GetProperty(ctx context.Context, req *models.GetPropertyRequest, cb *func(context.Context, *models.GetPropertyResponse, error) error) error
 - [x] HandleCombinedMarketStreamEvent(fn func(context.Context, *models.CombinedMarketStreamEvent) error)
-- [x] HandleErrorMessage(fn func(context.Context, *models.ErrorMessage) error)
 - [x] HandleNewSymbolInfoEvent(fn func(context.Context, *models.NewSymbolInfoEvent) error)
 - [x] HandleOpenInterestEvent(fn func(context.Context, *models.OpenInterestEvent) error)
 - [x] HandleMarkPriceEvent(fn func(context.Context, *models.MarkPriceEvent) error)
@@ -135,6 +133,7 @@ Validation Approach
 Known Behaviors
 - `SET_PROPERTY`/`GET_PROPERTY` may not ACK in all environments; tests treat timeouts as informational when they occur under short deadlines.
 - Options market activity is variable; suites use graceful timeouts to avoid false negatives when streams are quiet.
+- Latest SDK drop removed the standalone `HandleErrorMessage` hooks from market/combined channels; tests assert error envelopes via per-request callbacks instead.
 
 Next Steps
 - Add coverage for core `Client` methods (server CRUD, `RegisterHandlers`, `Wait`).

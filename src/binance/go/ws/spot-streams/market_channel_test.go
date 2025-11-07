@@ -31,20 +31,20 @@ func (w *unhandledCatcher) Write(p []byte) (int, error) {
 
 // market event recorder: records events from suite start so event tests can assert against accumulated data
 type spotMarketEventRecorder struct {
-	mu           sync.RWMutex
-	trade        []*models.TradeEvent
-	agg          []*models.AggregateTradeEvent
-	kline        []*models.KlineEvent
-	ticker       []*models.TickerEvent
-	miniTicker   []*models.MiniTickerEvent
-	bookTicker   []*models.BookTickerEvent
-	avgPrice     []*models.AveragePriceEvent
-	partialDepth []*models.PartialDepthEvent
-	diffDepth    []*models.DiffDepthEvent
-	allTickers   []*models.AllTickersEvent
-	allMini      []*models.AllMiniTickersEvent
-	allRoll      []*models.AllRollingWindowTickersEvent
-	combined     []*models.CombinedMarketStreamEvent
+	mu                  sync.RWMutex
+	trade               []*models.TradeEvent
+	agg                 []*models.AggregateTradeEvent
+	kline               []*models.KlineEvent
+	ticker              []*models.TickerEvent
+	miniTicker          []*models.MiniTickerEvent
+	bookTicker          []*models.BookTickerEvent
+	avgPrice            []*models.AveragePriceEvent
+	partialDepth        []*models.PartialDepthEvent
+	diffDepth           []*models.DiffDepthEvent
+	allTickers          []*models.AllTickersEvent
+	allMini             []*models.AllMiniTickersEvent
+	allRoll             []*models.AllRollingWindowTickersEvent
+	combined            []*models.CombinedMarketStreamEvent
 	rollingWindowTicker []*models.RollingWindowTickerEvent
 }
 
@@ -119,7 +119,6 @@ func (r *spotMarketEventRecorder) addRollingWindowTicker(ev *models.RollingWindo
 	r.rollingWindowTicker = append(r.rollingWindowTicker, ev)
 	r.mu.Unlock()
 }
-
 
 func (r *spotMarketEventRecorder) count(key string) int {
 	r.mu.RLock()
@@ -217,7 +216,6 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 	market := spotstreams.NewMarketStreamChannel(stc.client)
 	// Record events from the start of the suite
 	rec := newSpotMarketEventRecorder()
-	market.HandleErrorMessage(func(ctx context.Context, msg *models.ErrorMessage) error { logJSON(t, "ws.error", msg); return nil })
 	market.HandleTradeEvent(func(ctx context.Context, ev *models.TradeEvent) error { rec.addTrade(ev); return nil })
 	market.HandleAggregateTradeEvent(func(ctx context.Context, ev *models.AggregateTradeEvent) error { rec.addAgg(ev); return nil })
 	market.HandleKlineEvent(func(ctx context.Context, ev *models.KlineEvent) error { rec.addKline(ev); return nil })
@@ -269,7 +267,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		sid := time.Now().UnixMicro()
 		done := make(chan struct{}, 1)
 		var got *models.SubscribeResponse
-		subCb := func(ctx context.Context, resp *models.SubscribeResponse) error {
+		subCb := func(ctx context.Context, resp *models.SubscribeResponse, respErr error) error {
+			if respErr != nil {
+				t.Errorf("subscribe error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil subscribe response")
 				return nil
@@ -304,7 +306,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		}
 		// Cleanup
 		uid := time.Now().UnixMicro()
-		var unsubCb func(context.Context, *models.UnsubscribeResponse) error = func(ctx context.Context, resp *models.UnsubscribeResponse) error {
+		var unsubCb func(context.Context, *models.UnsubscribeResponse, error) error = func(ctx context.Context, resp *models.UnsubscribeResponse, respErr error) error {
+			if respErr != nil {
+				t.Errorf("unsubscribe error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil unsubscribe response")
 				return nil
@@ -329,7 +335,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build trade stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{tradePath}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -337,7 +343,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		lid := time.Now().UnixMicro()
 		listDone := make(chan struct{}, 1)
 		var got *models.ListSubscriptionsResponse
-		listCb := func(ctx context.Context, resp *models.ListSubscriptionsResponse) error {
+		listCb := func(ctx context.Context, resp *models.ListSubscriptionsResponse, respErr error) error {
+			if respErr != nil {
+				t.Errorf("listSubscriptions error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil list subscriptions response")
 				return nil
@@ -380,7 +390,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		sidTrue := time.Now().UnixMicro()
 		setTrueDone := make(chan struct{}, 1)
 		var gotSetTrue *models.SetPropertyResponse
-		setTrueCb := func(ctx context.Context, resp *models.SetPropertyResponse) error {
+		setTrueCb := func(ctx context.Context, resp *models.SetPropertyResponse, respErr error) error {
+			if respErr != nil {
+				t.Logf("setProperty(true) callback error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil setProperty(true) response")
 				return nil
@@ -423,7 +437,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		sidFalse := time.Now().UnixMicro()
 		setFalseDone := make(chan struct{}, 1)
 		var gotSetFalse *models.SetPropertyResponse
-		setFalseCb := func(ctx context.Context, resp *models.SetPropertyResponse) error {
+		setFalseCb := func(ctx context.Context, resp *models.SetPropertyResponse, respErr error) error {
+			if respErr != nil {
+				t.Logf("setProperty(false) callback error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil setProperty(false) response")
 				return nil
@@ -484,7 +502,11 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		getDone := make(chan struct{}, 1)
 		var gotGet *models.GetPropertyResponse
 		_ = gotGet
-		getCb := func(ctx context.Context, resp *models.GetPropertyResponse) error {
+		getCb := func(ctx context.Context, resp *models.GetPropertyResponse, respErr error) error {
+			if respErr != nil {
+				t.Logf("getProperty callback error: %v", respErr)
+				return nil
+			}
 			if resp == nil {
 				t.Errorf("nil getProperty response")
 				return nil
@@ -526,7 +548,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build trade stream: %v", err)
 		}
-		var subCb func(context.Context, *models.SubscribeResponse) error = func(context.Context, *models.SubscribeResponse) error { return nil }
+		var subCb func(context.Context, *models.SubscribeResponse, error) error = func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -555,7 +577,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build aggTrade stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -583,7 +605,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build kline stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -611,7 +633,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build ticker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -638,7 +660,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build miniTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -665,7 +687,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build bookTicker stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -690,7 +712,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build avgPrice stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -717,7 +739,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build partial depth stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -743,7 +765,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build diff depth stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -769,7 +791,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build all tickers stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -795,7 +817,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build all mini tickers stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
@@ -811,7 +833,7 @@ func TestFullIntegrationSuite_Market(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build all rolling tickers stream: %v", err)
 		}
-		subCb := func(context.Context, *models.SubscribeResponse) error { return nil }
+		subCb := func(context.Context, *models.SubscribeResponse, error) error { return nil }
 		throttleWS()
 		if err := market.Subscribe(context.Background(), &models.SubscribeRequest{Id: models.NewMessageIDInt64(time.Now().UnixMicro()), Params: []string{path}}, &subCb); err != nil {
 			t.Fatalf("subscribe failed: %v", err)
