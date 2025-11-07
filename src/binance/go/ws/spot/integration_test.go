@@ -2,574 +2,307 @@ package wstest
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/hmac"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/pem"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	spotws "github.com/openxapi/binance-go/ws/spot"
-	"github.com/openxapi/binance-go/ws/spot/models"
+	"github.com/gorilla/websocket"
+	spot "github.com/openxapi/binance-go/ws/spot"
 )
 
-// TestResult holds the result of a single test
-type TestResult struct {
-	TestName    string
-	Success     bool
-	Error       error
-	Duration    time.Duration
-	RateLimit   *RateLimitInfo
-	Description string
+const (
+	defaultConnectTimeout    = 12 * time.Second
+	defaultRequestTimeout    = 10 * time.Second
+	defaultDisconnectTimeout = 6 * time.Second
+	defaultTestnetServer     = "testnet2"
+	overrideServerName       = "override"
+)
+
+// TestConfig describes one credential bundle that can be used against the WS API.
+type TestConfig struct {
+	Name           string
+	Description    string
+	KeyType        spot.KeyType
+	APIKey         string
+	SecretKey      string
+	PrivateKeyPath string
+	PrivateKeyPass string
+	SupportsAuth   []spot.AuthType
 }
 
-// RateLimitInfo holds rate limit information from responses
-type RateLimitInfo struct {
-	Weight    int
-	Remaining int
-	ResetTime time.Time
-}
-
-// TestSuite manages all test execution
-type TestSuite struct {
-	results   []TestResult
-	mutex     sync.Mutex
-	startTime time.Time
-	rateLimit *RateLimitManager
-}
-
-// SharedClientManager manages shared WebSocket clients across tests
-type SharedClientManager struct {
-	clients   map[string]*spotws.Client
-	mutex     sync.RWMutex
-	cleanupFn func()
+// CredentialStore lazily loads credential bundles from the environment.
+type CredentialStore struct {
+	Public  *TestConfig
+	HMAC    *TestConfig
+	RSA     *TestConfig
+	Ed25519 *TestConfig
 }
 
 var (
-	sharedClients *SharedClientManager
-	once          sync.Once
+	credsOnce sync.Once
+	creds     CredentialStore
 )
 
-// RateLimitManager helps manage API call frequency
-type RateLimitManager struct {
-	lastCall    time.Time
-	callCount   int
-	mutex       sync.Mutex
-	minInterval time.Duration
+func getCreds() CredentialStore {
+	credsOnce.Do(func() {
+		creds = loadCredentialStore()
+	})
+	return creds
 }
 
-// KeyType represents different authentication key types
-type KeyType int
-
-const (
-	KeyTypeHMAC KeyType = iota
-	KeyTypeRSA
-	KeyTypeED25519
-)
-
-func (k KeyType) String() string {
-	switch k {
-	case KeyTypeHMAC:
-		return "HMAC"
-	case KeyTypeRSA:
-		return "RSA"
-	case KeyTypeED25519:
-		return "Ed25519"
-	default:
-		return "Unknown"
-	}
-}
-
-// AuthType represents different authorization levels
-type AuthType int
-
-const (
-	AuthTypeNONE AuthType = iota
-	AuthTypeUSER_DATA
-	AuthTypeUSER_STREAM
-	AuthTypeTRADE
-)
-
-func (a AuthType) String() string {
-	switch a {
-	case AuthTypeNONE:
-		return "NONE"
-	case AuthTypeUSER_DATA:
-		return "USER_DATA"
-	case AuthTypeUSER_STREAM:
-		return "USER_STREAM"
-	case AuthTypeTRADE:
-		return "TRADE"
-	default:
-		return "Unknown"
-	}
-}
-
-// TestConfig holds configuration for different test scenarios
-type TestConfig struct {
-	Name        string
-	KeyType     KeyType
-	AuthType    AuthType
-	APIKey      string
-	SecretKey   string
-	PrivateKey  string
-	Description string
-}
-
-// Global test suite instance
-var testSuite *TestSuite
-
-func init() {
-	testSuite = &TestSuite{
-		results:   make([]TestResult, 0),
-		startTime: time.Now(),
-		rateLimit: &RateLimitManager{
-			minInterval: 2 * time.Second, // Conservative rate limiting to prevent IP banning
+func loadCredentialStore() CredentialStore {
+	store := CredentialStore{
+		Public: &TestConfig{
+			Name:        "Public-NoAuth",
+			Description: "Public market-data requests (no authentication)",
 		},
 	}
-}
 
-func getTestConfigs() []TestConfig {
-	configs := []TestConfig{}
-
-	// NONE Authorization - Public endpoints (no auth required)
-	configs = append(configs, TestConfig{
-		Name:        "Public-NoAuth",
-		KeyType:     KeyTypeHMAC, // Doesn't matter for public endpoints
-		AuthType:    AuthTypeNONE,
-		Description: "Test public endpoints that don't require authentication",
-	})
-
-	// HMAC Authentication Tests
-	if apiKey := os.Getenv("BINANCE_API_KEY"); apiKey != "" {
-		if secretKey := os.Getenv("BINANCE_SECRET_KEY"); secretKey != "" {
-			configs = append(configs, TestConfig{
-				Name:        "HMAC-UserData",
-				KeyType:     KeyTypeHMAC,
-				AuthType:    AuthTypeUSER_DATA,
-				APIKey:      apiKey,
-				SecretKey:   secretKey,
-				Description: "Test USER_DATA endpoints with HMAC authentication",
-			})
-
-			configs = append(configs, TestConfig{
-				Name:        "HMAC-Trade",
-				KeyType:     KeyTypeHMAC,
-				AuthType:    AuthTypeTRADE,
-				APIKey:      apiKey,
-				SecretKey:   secretKey,
-				Description: "Test TRADE endpoints with HMAC authentication",
-			})
-		}
-	}
-
-	// RSA Authentication Tests
-	if apiKey := os.Getenv("BINANCE_RSA_API_KEY"); apiKey != "" {
-		if privateKeyPath := os.Getenv("BINANCE_RSA_PRIVATE_KEY_PATH"); privateKeyPath != "" {
-			if _, err := os.Stat(privateKeyPath); err == nil {
-				configs = append(configs, TestConfig{
-					Name:        "RSA-UserData",
-					KeyType:     KeyTypeRSA,
-					AuthType:    AuthTypeUSER_DATA,
-					APIKey:      apiKey,
-					PrivateKey:  privateKeyPath,
-					Description: "Test USER_DATA endpoints with RSA authentication",
-				})
-
-				configs = append(configs, TestConfig{
-					Name:        "RSA-Trade",
-					KeyType:     KeyTypeRSA,
-					AuthType:    AuthTypeTRADE,
-					APIKey:      apiKey,
-					PrivateKey:  privateKeyPath,
-					Description: "Test TRADE endpoints with RSA authentication",
-				})
+	if apiKey := strings.TrimSpace(os.Getenv("BINANCE_API_KEY")); apiKey != "" {
+		if secret := strings.TrimSpace(os.Getenv("BINANCE_SECRET_KEY")); secret != "" {
+			store.HMAC = &TestConfig{
+				Name:         "HMAC",
+				Description:  "Signed USER_DATA / TRADE requests via HMAC",
+				KeyType:      spot.KeyTypeHMAC,
+				APIKey:       apiKey,
+				SecretKey:    secret,
+				SupportsAuth: []spot.AuthType{spot.AuthTypeUserData, spot.AuthTypeTrade, spot.AuthTypeSigned, spot.AuthTypeUserStream},
 			}
 		}
 	}
 
-	// Ed25519 Authentication Tests
-	if apiKey := os.Getenv("BINANCE_ED25519_API_KEY"); apiKey != "" {
-		if privateKeyPath := os.Getenv("BINANCE_ED25519_PRIVATE_KEY_PATH"); privateKeyPath != "" {
-			if _, err := os.Stat(privateKeyPath); err == nil {
-				configs = append(configs, TestConfig{
-					Name:        "Ed25519-UserData",
-					KeyType:     KeyTypeED25519,
-					AuthType:    AuthTypeUSER_DATA,
-					APIKey:      apiKey,
-					PrivateKey:  privateKeyPath,
-					Description: "Test USER_DATA endpoints with Ed25519 authentication",
-				})
-
-				configs = append(configs, TestConfig{
-					Name:        "Ed25519-Trade",
-					KeyType:     KeyTypeED25519,
-					AuthType:    AuthTypeTRADE,
-					APIKey:      apiKey,
-					PrivateKey:  privateKeyPath,
-					Description: "Test TRADE endpoints with Ed25519 authentication",
-				})
+	if apiKey := strings.TrimSpace(os.Getenv("BINANCE_RSA_API_KEY")); apiKey != "" {
+		if path := strings.TrimSpace(os.Getenv("BINANCE_RSA_PRIVATE_KEY_PATH")); path != "" {
+			store.RSA = &TestConfig{
+				Name:           "RSA",
+				Description:    "Signed USER_DATA / TRADE requests via RSA",
+				KeyType:        spot.KeyTypeRSA,
+				APIKey:         apiKey,
+				PrivateKeyPath: path,
+				PrivateKeyPass: strings.TrimSpace(os.Getenv("BINANCE_RSA_PRIVATE_KEY_PASSPHRASE")),
+				SupportsAuth:   []spot.AuthType{spot.AuthTypeUserData, spot.AuthTypeTrade, spot.AuthTypeSigned, spot.AuthTypeUserStream},
 			}
 		}
 	}
 
-	return configs
+	if apiKey := strings.TrimSpace(os.Getenv("BINANCE_ED25519_API_KEY")); apiKey != "" {
+		if path := strings.TrimSpace(os.Getenv("BINANCE_ED25519_PRIVATE_KEY_PATH")); path != "" {
+			store.Ed25519 = &TestConfig{
+				Name:           "Ed25519",
+				Description:    "Signed requests using Ed25519 (required for session.logon)",
+				KeyType:        spot.KeyTypeED25519,
+				APIKey:         apiKey,
+				PrivateKeyPath: path,
+				PrivateKeyPass: strings.TrimSpace(os.Getenv("BINANCE_ED25519_PRIVATE_KEY_PASSPHRASE")),
+				SupportsAuth:   []spot.AuthType{spot.AuthTypeUserData, spot.AuthTypeTrade, spot.AuthTypeSigned, spot.AuthTypeUserStream},
+			}
+		}
+	}
+
+	return store
 }
 
-// Helper functions for test setup
-func setupClient(config TestConfig) (*spotws.Client, error) {
-	client := spotws.NewClient()
-
-	// Set to testnet server
-	err := client.SetActiveServer("testnet1")
-	if err != nil {
-		return nil, fmt.Errorf("failed to set testnet server: %w", err)
+func (cfg *TestConfig) supports(auth spot.AuthType) bool {
+	if cfg == nil {
+		return false
 	}
-
-	// Set auth if provided
-	if config.APIKey != "" {
-		auth := &spotws.Auth{
-			APIKey: config.APIKey,
-		}
-		if config.SecretKey != "" {
-			auth.SetSecretKey(config.SecretKey)
-		}
-		if config.PrivateKey != "" {
-			auth.PrivateKeyPath = config.PrivateKey
-		}
-		client.SetAuth(auth)
+	if auth == spot.AuthTypeNone {
+		return true
 	}
-
-	// Register essential event handlers to prevent "No handler found" errors
-	// These handlers are needed for any WebSocket operations that might trigger events
-	client.HandleEventStreamTerminatedEvent(func(event *models.EventStreamTerminatedEvent) error {
-		// Silent handler to prevent "No handler found" log messages
-		return nil
-	})
-
-	client.HandleOutboundAccountPositionEvent(func(event *models.OutboundAccountPositionEvent) error {
-		// Silent handler for account position events
-		return nil
-	})
-
-	client.HandleBalanceUpdateEvent(func(event *models.BalanceUpdateEvent) error {
-		// Silent handler for balance update events
-		return nil
-	})
-
-	client.HandleExecutionReportEvent(func(event *models.ExecutionReportEvent) error {
-		// Silent handler for execution report events
-		return nil
-	})
-
-	client.HandleListStatusEvent(func(event *models.ListStatusEvent) error {
-		// Silent handler for list status events
-		return nil
-	})
-
-	client.HandleListenKeyExpiredEvent(func(event *models.ListenKeyExpiredEvent) error {
-		// Silent handler for listen key expired events
-		return nil
-	})
-
-	client.HandleExternalLockUpdateEvent(func(event *models.ExternalLockUpdateEvent) error {
-		// Silent handler for external lock update events
-		return nil
-	})
-
-	// Connect to the WebSocket server
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	err = client.Connect(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to WebSocket: %w", err)
+	if cfg.APIKey == "" {
+		return false
 	}
-
-	return client, nil
+	if len(cfg.SupportsAuth) == 0 {
+		// Assume all signed flows if unspecified.
+		return true
+	}
+	for _, a := range cfg.SupportsAuth {
+		if a == auth {
+			return true
+		}
+	}
+	return false
 }
 
-func runWithTimeout(t *testing.T, name string, timeout time.Duration, testFunc func() error) {
+// newClientAndSigner constructs a client (always switching to testnet unless overridden)
+// and returns an optional signer when credentials are available.
+func (cfg *TestConfig) newClientAndSigner(t testing.TB) (*spot.Client, *spot.RequestSigner) {
 	t.Helper()
+	if cfg == nil {
+		t.Fatalf("test configuration is required")
+	}
 
-	start := time.Now()
-	done := make(chan error, 1)
+	client := spot.NewClient()
+	if err := ensureDefaultServer(client); err != nil {
+		t.Fatalf("failed to select WS server for %s: %v", cfg.Name, err)
+	}
 
-	go func() {
-		done <- testFunc()
-	}()
+	if cfg.APIKey == "" {
+		return client, nil
+	}
 
-	select {
-	case err := <-done:
-		duration := time.Since(start)
-		if err != nil {
-			t.Errorf("%s failed after %v: %v", name, duration, err)
-		} else {
-			t.Logf("%s passed in %v", name, duration)
+	auth := spot.NewAuth(cfg.APIKey)
+	switch cfg.KeyType {
+	case spot.KeyTypeHMAC:
+		if cfg.SecretKey == "" {
+			t.Skipf("skipping %s: BINANCE_SECRET_KEY not configured", cfg.Name)
 		}
-	case <-time.After(timeout):
-		t.Errorf("%s timed out after %v", name, timeout)
-	}
-}
-
-// initSharedClients initializes the shared client manager
-func initSharedClients() {
-	once.Do(func() {
-		sharedClients = &SharedClientManager{
-			clients: make(map[string]*spotws.Client),
+		auth.SetSecretKey(cfg.SecretKey)
+	case spot.KeyTypeRSA, spot.KeyTypeED25519:
+		if cfg.PrivateKeyPath == "" {
+			t.Skipf("skipping %s: private key path not configured", cfg.Name)
 		}
-
-		// Register cleanup function to disconnect all clients at program exit
-		sharedClients.cleanupFn = func() {
-			sharedClients.mutex.Lock()
-			defer sharedClients.mutex.Unlock()
-
-			for configName, client := range sharedClients.clients {
-				if client != nil {
-					client.Disconnect()
-					delete(sharedClients.clients, configName)
-				}
-			}
+		auth.SetPrivateKeyPath(cfg.PrivateKeyPath)
+		if cfg.PrivateKeyPass != "" {
+			auth.SetPassphrase(cfg.PrivateKeyPass)
 		}
-	})
-}
-
-// getOrCreateSharedClient gets or creates a shared client for the given config
-func getOrCreateSharedClient(t *testing.T, config TestConfig) *spotws.Client {
-	initSharedClients()
-
-	sharedClients.mutex.RLock()
-	client, exists := sharedClients.clients[config.Name]
-	sharedClients.mutex.RUnlock()
-
-	if exists && client != nil {
-		return client
-	}
-
-	// Need to create a new client
-	sharedClients.mutex.Lock()
-	defer sharedClients.mutex.Unlock()
-
-	// Double-check in case another goroutine created it
-	if client, exists := sharedClients.clients[config.Name]; exists && client != nil {
-		return client
-	}
-
-	// Create new client
-	newClient, err := setupClient(config)
-	if err != nil {
-		t.Logf("Failed to setup shared client for %s: %v", config.Name, err)
-		return nil
-	}
-
-	sharedClients.clients[config.Name] = newClient
-
-	// Don't register cleanup here - let TestMain handle it
-	// This prevents premature disconnection during subtests
-
-	return newClient
-}
-
-// disconnectSharedClient disconnects and removes a shared client
-func disconnectSharedClient(configName string) {
-	if sharedClients == nil {
-		return
-	}
-
-	sharedClients.mutex.Lock()
-	defer sharedClients.mutex.Unlock()
-
-	if client, exists := sharedClients.clients[configName]; exists && client != nil {
-		client.Disconnect()
-		delete(sharedClients.clients, configName)
-	}
-}
-
-// disconnectAllSharedClients disconnects all shared clients
-func disconnectAllSharedClients() {
-	if sharedClients == nil {
-		return
-	}
-
-	if sharedClients.cleanupFn != nil {
-		sharedClients.cleanupFn()
-	}
-}
-
-// generateSignature creates signature for the query string based on key type
-func generateSignature(config TestConfig, queryString string) (string, error) {
-	switch config.KeyType {
-	case KeyTypeHMAC:
-		h := hmac.New(sha256.New, []byte(config.SecretKey))
-		h.Write([]byte(queryString))
-		return hex.EncodeToString(h.Sum(nil)), nil
-	case KeyTypeED25519:
-		// Load Ed25519 private key from file
-		privateKeyBytes, err := ioutil.ReadFile(config.PrivateKey)
-		if err != nil {
-			return "", fmt.Errorf("failed to read Ed25519 private key: %w", err)
-		}
-
-		var privateKey ed25519.PrivateKey
-
-		// Try to parse as PEM first
-		block, _ := pem.Decode(privateKeyBytes)
-		if block != nil {
-			// Parse PEM-encoded key
-			parsedKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-			if err != nil {
-				return "", fmt.Errorf("failed to parse Ed25519 PEM private key: %w", err)
-			}
-
-			ed25519Key, ok := parsedKey.(ed25519.PrivateKey)
-			if !ok {
-				return "", fmt.Errorf("private key is not Ed25519")
-			}
-			privateKey = ed25519Key
-		} else {
-			// Handle raw hex or base64 formats
-			keyStr := strings.TrimSpace(string(privateKeyBytes))
-			keyStr = strings.ReplaceAll(keyStr, "\n", "")
-			keyStr = strings.ReplaceAll(keyStr, "\r", "")
-			keyStr = strings.ReplaceAll(keyStr, " ", "")
-
-			// Try hex first (32 bytes = 64 hex chars for seed, 64 bytes = 128 hex chars for full key)
-			if len(keyStr) == 64 {
-				// 32-byte seed format
-				seedBytes, err := hex.DecodeString(keyStr)
-				if err != nil {
-					return "", fmt.Errorf("failed to decode Ed25519 seed as hex: %w", err)
-				}
-				privateKey = ed25519.NewKeyFromSeed(seedBytes)
-			} else if len(keyStr) == 128 {
-				// 64-byte full key format
-				keyBytes, err := hex.DecodeString(keyStr)
-				if err != nil {
-					return "", fmt.Errorf("failed to decode Ed25519 private key as hex: %w", err)
-				}
-				privateKey = ed25519.PrivateKey(keyBytes)
-			} else {
-				// Try base64
-				keyBytes, err := base64.StdEncoding.DecodeString(keyStr)
-				if err != nil {
-					return "", fmt.Errorf("failed to decode Ed25519 private key as base64: %w", err)
-				}
-
-				if len(keyBytes) == 32 {
-					// 32-byte seed
-					privateKey = ed25519.NewKeyFromSeed(keyBytes)
-				} else if len(keyBytes) == 64 {
-					// 64-byte full key
-					privateKey = ed25519.PrivateKey(keyBytes)
-				} else {
-					return "", fmt.Errorf("invalid Ed25519 key length: %d bytes (expected 32 or 64)", len(keyBytes))
-				}
-			}
-		}
-
-		// Verify we have a valid private key
-		if len(privateKey) != ed25519.PrivateKeySize {
-			return "", fmt.Errorf("invalid Ed25519 private key size: %d bytes (expected %d)", len(privateKey), ed25519.PrivateKeySize)
-		}
-
-		// Sign the query string
-		signature := ed25519.Sign(privateKey, []byte(queryString))
-
-		// Log for debugging (remove in production)
-		// fmt.Printf("Debug: Signing query string '%s' with Ed25519 key\n", queryString)
-		// fmt.Printf("Debug: Signature length: %d bytes\n", len(signature))
-
-		// Use base64 encoding to match the WebSocket SDK implementation
-		return base64.StdEncoding.EncodeToString(signature), nil
-	case KeyTypeRSA:
-		// For RSA, we'd need to implement RSA signing, but session.logon only supports Ed25519
-		return "", fmt.Errorf("RSA signing not supported for session.logon")
 	default:
-		return "", fmt.Errorf("unsupported key type: %v", config.KeyType)
-	}
-}
-
-func (rm *RateLimitManager) Wait() {
-	rm.mutex.Lock()
-	defer rm.mutex.Unlock()
-
-	now := time.Now()
-	if elapsed := now.Sub(rm.lastCall); elapsed < rm.minInterval {
-		sleepTime := rm.minInterval - elapsed
-		time.Sleep(sleepTime)
+		t.Fatalf("unsupported key type %q for config %s", cfg.KeyType, cfg.Name)
 	}
 
-	rm.lastCall = time.Now()
-	rm.callCount++
+	client.SetAuth(auth)
+	signer := spot.NewRequestSigner(auth)
+	if err := signer.EnsureInitialized(); err != nil {
+		t.Skipf("credentials for %s are not usable: %v", cfg.Name, err)
+	}
+
+	return client, signer
 }
 
-// Test function template - creates individual clients but with rate limiting
-func testEndpoint(t *testing.T, config TestConfig, testName string, testFunc func(*spotws.Client, TestConfig) error) {
-	testEndpointWithTimeout(t, config, testName, testFunc, 10*time.Second)
+// channelHarness bundles a client, signer, and channel for a specific credential set.
+type channelHarness struct {
+	Config  *TestConfig
+	Client  *spot.Client
+	Signer  *spot.RequestSigner
+	Channel *spot.SpotChannel
 }
 
-// Test function template with configurable timeout
-func testEndpointWithTimeout(t *testing.T, config TestConfig, testName string, testFunc func(*spotws.Client, TestConfig) error, timeout time.Duration) {
+func newChannelHarness(t testing.TB, cfg *TestConfig) *channelHarness {
 	t.Helper()
-
-	// Rate limit connection attempts to prevent IP banning
-	testSuite.rateLimit.Wait()
-
-	client, err := setupClient(config)
-	if err != nil {
-		t.Fatalf("Failed to setup client: %v", err)
+	client, signer := cfg.newClientAndSigner(t)
+	return &channelHarness{
+		Config:  cfg,
+		Client:  client,
+		Signer:  signer,
+		Channel: spot.NewSpotChannel(client),
 	}
-	defer client.Disconnect()
-
-	runWithTimeout(t, testName, timeout, func() error {
-		return testFunc(client, config)
-	})
 }
 
-// Utility function to get current price for testing
-func getCurrentPrice(client *spotws.Client, symbol string) (float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (h *channelHarness) connect(t testing.TB) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultConnectTimeout)
+	defer cancel()
+	if err := h.Channel.Connect(ctx); err != nil {
+		active := "<unknown>"
+		if info := h.Client.GetActiveServer(); info != nil && info.URL != "" {
+			active = info.URL
+		}
+		detailParts := []string{fmt.Sprintf("server=%s", active)}
+		if errors.Is(err, websocket.ErrBadHandshake) {
+			detailParts = append(detailParts, "handshake_err=websocket.ErrBadHandshake")
+		}
+		if chain := unwrapErrorChain(err); chain != "" {
+			detailParts = append(detailParts, fmt.Sprintf("error_chain=%s", chain))
+		}
+		if probe := probeHTTPContext(active); probe != "" {
+			detailParts = append(detailParts, probe)
+		}
+		t.Fatalf("connect %s failed: %v (%s)", h.Config.Name, err, strings.Join(detailParts, " "))
+	}
+}
+
+func (h *channelHarness) disconnect(t testing.TB) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDisconnectTimeout)
+	defer cancel()
+	if err := h.Channel.Disconnect(ctx); err != nil && !isContextCanceled(err) {
+		t.Errorf("disconnect %s: %v", h.Config.Name, err)
+	}
+}
+
+func isContextCanceled(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+func ensureDefaultServer(client *spot.Client) error {
+	if v := strings.TrimSpace(os.Getenv("BINANCE_SPOT_WS_SERVER")); v != "" {
+		if err := client.AddOrUpdateServer(overrideServerName, v, "Override", "Test override server"); err != nil {
+			return fmt.Errorf("register override server: %w", err)
+		}
+		if err := client.SetActiveServer(overrideServerName); err != nil {
+			return fmt.Errorf("activate override server: %w", err)
+		}
+		return nil
+	}
+	if err := client.SetActiveServer(defaultTestnetServer); err != nil {
+		return fmt.Errorf("set active server %q: %w", defaultTestnetServer, err)
+	}
+	return nil
+}
+
+func unwrapErrorChain(err error) string {
+	if err == nil {
+		return ""
+	}
+	seen := make(map[string]struct{})
+	var parts []string
+	for current := err; current != nil; current = errors.Unwrap(current) {
+		part := current.Error()
+		if _, ok := seen[part]; ok {
+			break
+		}
+		seen[part] = struct{}{}
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, " -> ")
+}
+
+func probeHTTPContext(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Sprintf("probe=parse_err:%v", err)
+	}
+	switch u.Scheme {
+	case "wss":
+		u.Scheme = "https"
+	case "ws":
+		u.Scheme = "http"
+	case "https", "http":
+	default:
+		return fmt.Sprintf("probe=unsupported_scheme:%s", u.Scheme)
+	}
+
+	probeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	responseChan := make(chan *models.TickerPriceResponse, 1)
-	errChan := make(chan error, 1)
-
-	err := client.SendTickerPrice(ctx,
-		models.NewTickerPriceRequest().SetSymbol(symbol),
-		func(response *models.TickerPriceResponse, err error) error {
-			if err != nil {
-				errChan <- err
-			} else {
-				responseChan <- response
-			}
-			return err
-		})
-
+	req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send ticker price request: %w", err)
+		return fmt.Sprintf("probe=request_err:%v", err)
 	}
-
-	select {
-	case response := <-responseChan:
-		if response.Result == nil {
-			return 0, fmt.Errorf("received nil result in ticker price response")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		var netErr net.Error
+		if errors.As(err, &netErr) {
+			return fmt.Sprintf("probe=network_err:%v", netErr)
 		}
-		if response.Result.Price != "" {
-			return strconv.ParseFloat(response.Result.Price, 64)
-		}
-		return 0, fmt.Errorf("empty price in response")
-	case err := <-errChan:
-		return 0, err
-	case <-ctx.Done():
-		return 0, fmt.Errorf("ticker price timeout")
+		return fmt.Sprintf("probe=do_err:%v", err)
 	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	snippet := strings.TrimSpace(string(body))
+	if len(snippet) > 200 {
+		snippet = snippet[:200] + "..."
+	}
+	return fmt.Sprintf("probe_status=%d %s", resp.StatusCode, snippet)
 }

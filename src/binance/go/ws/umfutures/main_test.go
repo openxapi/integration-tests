@@ -1,219 +1,49 @@
 package wstest
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strings"
 	"testing"
-	"time"
-
-	umfuturesws "github.com/openxapi/binance-go/ws/umfutures"
 )
 
-// TestMain controls test execution and can run the full integration suite if needed
 func TestMain(m *testing.M) {
-	flag.Parse()
-
-	// Run the tests
 	code := m.Run()
-
-	// Clean up all shared clients
-	disconnectAllSharedClients()
-
-	// Print summary if running all tests
 	if testing.Verbose() {
-		printTestSummary()
+		printHarnessSummary()
 	}
-
 	os.Exit(code)
 }
 
-func printTestSummary() {
-	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("📊 UMFUTURES WEBSOCKET INTEGRATION TEST SUMMARY")
-	fmt.Println(strings.Repeat("=", 80))
+func printHarnessSummary() {
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 78))
+	fmt.Println("Binance USD-M Futures WS Integration Harness")
+	fmt.Println(strings.Repeat("=", 78))
 
-	configs := getTestConfigs()
+	creds := getCreds()
+	fmt.Println("Credential bundles:")
+	printConfigStatus("Public-NoAuth", creds.Public != nil)
+	printConfigStatus("HMAC", creds.HMAC != nil)
+	printConfigStatus("RSA", creds.RSA != nil)
+	printConfigStatus("Ed25519", creds.Ed25519 != nil)
 
-	fmt.Printf("📋 Available Test Configurations:\n")
-	for _, config := range configs {
-		fmt.Printf("  - %s: %s (%s auth)\n", config.Name, config.Description, config.AuthType)
-	}
+	fmt.Println("\nSuites:")
+	fmt.Println("  - UmFuturesChannel     → TestFullIntegrationSuite_UmFutures")
 
-	fmt.Printf("\n💡 Usage Examples:\n")
-	fmt.Printf("  # Run all tests:\n")
-	fmt.Printf("  go test -v\n\n")
+	fmt.Println("\nCommon flags:")
+	fmt.Println("  WS_THROTTLE_MS             request pacing (default 300)")
+	fmt.Println("  EVENT_WAIT_SECS            event wait duration (default 20)")
+	fmt.Println("  BINANCE_UMFUTURES_WS_SERVER optional WS override (wss://...)")
+	fmt.Println("  BINANCE_UMFUTURES_REST_SERVER optional REST override (https://...)")
 
-	fmt.Printf("  # Run only public endpoint tests:\n")
-	fmt.Printf("  go test -v -run TestTickerPrice\n")
-	fmt.Printf("  go test -v -run 'Test.*Public.*'\n\n")
-
-	fmt.Printf("  # Run tests for specific auth type:\n")
-	fmt.Printf("  go test -v -run 'Test.*HMAC.*'\n")
-	fmt.Printf("  go test -v -run 'Test.*Ed25519.*'\n\n")
-
-	fmt.Printf("  # Run specific endpoint tests:\n")
-	fmt.Printf("  go test -v -run TestOrderPlace\n")
-	fmt.Printf("  go test -v -run TestAccountBalance\n")
-	fmt.Printf("  go test -v -run TestUserDataStream\n\n")
-
-	fmt.Printf("  # Run trading tests only:\n")
-	fmt.Printf("  go test -v trading_test.go integration_test.go\n\n")
-
-	fmt.Printf("  # Run with timeout:\n")
-	fmt.Printf("  go test -v -timeout 10m\n\n")
-
-	fmt.Printf("⚠️  Notes:\n")
-	fmt.Printf("  - Set environment variables for authentication:\n")
-	fmt.Printf("    BINANCE_API_KEY & BINANCE_SECRET_KEY (HMAC)\n")
-	fmt.Printf("    BINANCE_RSA_API_KEY & BINANCE_RSA_PRIVATE_KEY_PATH (RSA)\n")
-	fmt.Printf("    BINANCE_ED25519_API_KEY & BINANCE_ED25519_PRIVATE_KEY_PATH (Ed25519)\n")
-	fmt.Printf("  - Tests use Binance Futures testnet for safety\n")
-	fmt.Printf("  - Rate limiting: 2 seconds between connections\n")
-
-	fmt.Println(strings.Repeat("=", 80))
+	fmt.Println(strings.Repeat("=", 78))
 }
 
-// Integration test that runs the full original test suite for comparison
-func TestFullIntegrationSuite(t *testing.T) {
-	t.Log("🚀 Running Full UMFUTURES WebSocket Integration Test Suite")
-	t.Log("================================================================================")
-	t.Log("🌐 Server: Binance Futures Testnet (wss://testnet.binancefuture.com/ws-fapi/v1)")
-	t.Log("💡 Safe for testing - no real money at risk")
-	t.Log("================================================================================")
-
-	configs := getTestConfigs()
-
-	if len(configs) <= 1 {
-		t.Log("⚠️  Warning: Limited authentication credentials available.")
-		t.Log("   Set environment variables for comprehensive testing:")
-		t.Log("   - BINANCE_API_KEY & BINANCE_SECRET_KEY (for HMAC)")
-		t.Log("   - BINANCE_RSA_API_KEY & BINANCE_RSA_PRIVATE_KEY_PATH (for RSA)")
-		t.Log("   - BINANCE_ED25519_API_KEY & BINANCE_ED25519_PRIVATE_KEY_PATH (for Ed25519)")
+func printConfigStatus(name string, available bool) {
+	if available {
+		fmt.Printf("  [x] %s\n", name)
+	} else {
+		fmt.Printf("  [ ] %s (not configured)\n", name)
 	}
-
-	var totalTests, passedTests int
-	var failedTests []string
-
-	startTime := time.Now()
-
-	for _, config := range configs {
-		t.Logf("\n🔧 Testing Configuration: %s", config.Name)
-		t.Logf("   Key Type: %s, Auth Type: %s", config.KeyType, config.AuthType)
-		t.Logf("   Description: %s", config.Description)
-
-		configStartTime := time.Now()
-		configPassed := 0
-		configTotal := 0
-
-		// Run all test functions for this config
-		testFunctions := []struct {
-			name         string
-			fn           func(*umfuturesws.Client, TestConfig) error
-			authRequired AuthType
-			keyRequired  *KeyType // Optional: only run for specific key types
-			keyExcluded  *KeyType // Optional: skip for specific key types
-		}{
-			// Public tests (no auth required)
-			{"TickerPrice", testTickerPrice, AuthTypeNONE, nil, nil},
-			{"BookTicker", testBookTicker, AuthTypeNONE, nil, nil},
-			{"Depth", testDepth, AuthTypeNONE, nil, nil},
-
-			// User data tests
-			{"AccountBalance", testAccountBalance, AuthTypeUSER_DATA, nil, nil},
-			{"AccountPosition", testAccountPosition, AuthTypeUSER_DATA, nil, nil},
-			{"AccountStatus", testAccountStatus, AuthTypeUSER_DATA, nil, nil},
-			{"V2AccountBalance", testV2AccountBalance, AuthTypeUSER_DATA, nil, nil},
-			{"V2AccountPosition", testV2AccountPosition, AuthTypeUSER_DATA, nil, nil},
-			{"V2AccountStatus", testV2AccountStatus, AuthTypeUSER_DATA, nil, nil},
-
-			// User stream tests
-			{"UserDataStreamStart", testUserDataStreamStart, AuthTypeUSER_STREAM, nil, nil},
-			{"UserDataStreamPing", testUserDataStreamPing, AuthTypeUSER_STREAM, nil, nil},
-			{"UserDataStreamStop", testUserDataStreamStop, AuthTypeUSER_STREAM, nil, nil},
-			{"UserDataEventHandlers", testUserDataEventHandlers, AuthTypeUSER_STREAM, nil, nil},
-
-			// Session tests (authentication requirements updated)
-			{"SessionLogon", testSessionLogon, AuthTypeUSER_STREAM, &[]KeyType{KeyTypeED25519}[0], nil},    // Ed25519 only
-			{"SessionLogout", testSessionLogout, AuthTypeUSER_STREAM, nil, nil},  // Uses NONE auth internally
-			{"SessionStatus", testSessionStatus, AuthTypeUSER_STREAM, nil, nil},  // Uses NONE auth internally
-
-			// Trading tests
-			{"OrderPlace", testOrderPlace, AuthTypeTRADE, nil, nil},
-			{"OrderStatus", testOrderStatus, AuthTypeTRADE, nil, nil},
-			{"OrderCancel", testOrderCancel, AuthTypeTRADE, nil, nil},
-			{"OrderModify", testOrderModify, AuthTypeTRADE, nil, nil},
-		}
-
-		client, err := setupClient(config)
-		if err != nil {
-			t.Fatalf("Failed to setup client for %s: %v", config.Name, err)
-		}
-
-		for _, testFunc := range testFunctions {
-			// Check if test should run for this configuration
-			if testFunc.authRequired != config.AuthType {
-				continue
-			}
-
-			// Check if test requires specific key type
-			if testFunc.keyRequired != nil && config.KeyType != *testFunc.keyRequired {
-				continue
-			}
-
-			// Check if test should be excluded for this key type
-			if testFunc.keyExcluded != nil && config.KeyType == *testFunc.keyExcluded {
-				// Log that we're skipping this test
-				t.Logf("   🧪 Skipping %s... ⏭️  (Not supported with %s authentication)", testFunc.name, config.KeyType)
-				continue
-			}
-
-			configTotal++
-			totalTests++
-
-			testSuite.rateLimit.Wait()
-
-			start := time.Now()
-			err := testFunc.fn(client, config)
-			duration := time.Since(start)
-
-			if err != nil {
-				t.Logf("   🧪 Running %s... ❌ Failed (%v)", testFunc.name, duration)
-				t.Logf("      Error: %v", err)
-				failedTests = append(failedTests, fmt.Sprintf("%s-%s", config.Name, testFunc.name))
-			} else {
-				t.Logf("   🧪 Running %s... ✅ Passed (%v)", testFunc.name, duration)
-				configPassed++
-				passedTests++
-			}
-		}
-
-		client.Disconnect()
-
-		configDuration := time.Since(configStartTime)
-		t.Logf("   📊 Configuration %s: %d/%d passed (%.1f%%) in %v",
-			config.Name, configPassed, configTotal,
-			float64(configPassed)/float64(configTotal)*100, configDuration)
-	}
-
-	totalDuration := time.Since(startTime)
-
-	t.Log("\n" + strings.Repeat("=", 80))
-	t.Log("📊 TEST SUMMARY")
-	t.Log(strings.Repeat("=", 80))
-	t.Logf("Total Tests: %d", totalTests)
-	t.Logf("✅ Passed: %d", passedTests)
-	t.Logf("❌ Failed: %d", totalTests-passedTests)
-	t.Logf("⏱️  Total Duration: %v", totalDuration)
-	t.Logf("📈 Success Rate: %.1f%%", float64(passedTests)/float64(totalTests)*100)
-
-	if len(failedTests) > 0 {
-		t.Log("\n❌ Failed Tests:")
-		for _, failedTest := range failedTests {
-			t.Logf("  - %s", failedTest)
-		}
-	}
-
-	t.Log(strings.Repeat("=", 80))
 }

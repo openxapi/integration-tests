@@ -1,176 +1,82 @@
 # Binance USDⓈ-M Futures WebSocket Integration Tests
 
-This directory contains integration tests for the Binance USDⓈ-M Futures WebSocket API client generated from AsyncAPI specifications.
+This module exercises the regenerated Go SDK at `github.com/openxapi/binance-go/ws/umfutures`.  
+The suite connects to the Binance USDⓈ-M Futures **testnet** WebSocket endpoint, drives every
+exported channel method, and validates typed responses alongside signing flows.
 
-## Overview
+## Test Layout
 
-These tests validate the generated Go WebSocket client for Binance USD-M Futures trading against the official Binance testnet. The tests cover:
+| File | Role |
+| --- | --- |
+| `main_test.go` | Prints harness summary and wiring for verbose runs |
+| `integration_test.go` | Credential loader, client/channel harness, server helpers |
+| `umfutures_channel_test.go` | End-to-end suite (`TestFullIntegrationSuite_UmFutures`) with subtests for public, user-data, trading, and session flows |
+| `assert_helpers_test.go` | Shared numeric/string assertions |
+| `signing_helpers_test.go` | Wrapper that mirrors SDK signing into request structs |
+| `timing_helpers_test.go` | Throttling and event wait utilities |
+| `log_helpers_test.go` | Debug logging of requests on test failure |
+| `rest_helpers_test.go` | Lightweight REST helpers (symbol discovery, order parameter sizing) |
 
-- **Public Endpoints**: Market data that doesn't require authentication
-- **User Data Endpoints**: Account information requiring USER_DATA permission
-- **Trading Endpoints**: Order management requiring TRADE permission
+## Executing the Suite
 
-## Test Structure
-
-- `main_test.go` - Main test suite orchestration and configuration
-- `integration_test.go` - Core test infrastructure and utilities
-- `public_test.go` - Public endpoint tests (ticker, depth, etc.)
-- `userdata_test.go` - User data endpoint tests (account, positions, status)
-- `trading_test.go` - Trading endpoint tests (orders, user data streams)
-
-## Available Endpoints
-
-### Public Endpoints (No Authentication)
-- `ticker.price` - Get symbol price ticker
-- `ticker.book` - Get best bid/ask prices
-- `depth` - Get order book depth
-
-### User Data Endpoints (USER_DATA Authentication)
-- `account.balance` - Get account balance
-- `account.position` - Get position information
-- `account.status` - Get account status
-
-### Trading Endpoints (TRADE Authentication)
-- `userDataStream.start` - Start user data stream
-- `userDataStream.ping` - Keep user data stream alive
-- `userDataStream.stop` - Stop user data stream
-- `order.place` - Place new orders
-- `order.status` - Check order status
-- `order.cancel` - Cancel orders
-- `order.modify` - Modify existing orders
-
-## Authentication Types Supported
-
-- **HMAC-SHA256**: Traditional API key + secret
-- **RSA**: RSA private key signing
-- **Ed25519**: Modern elliptic curve signing
-
-## Setup Instructions
-
-1. **Copy Environment File**:
-   ```bash
-   cp env.example env.local
-   ```
-
-2. **Configure Testnet Credentials**:
-   Edit `env.local` with your Binance Futures testnet API credentials:
-   - Get testnet keys from: https://testnet.binancefuture.com/
-   
-   ```bash
-   # HMAC Authentication
-   export BINANCE_API_KEY=your_testnet_hmac_api_key_here
-   export BINANCE_SECRET_KEY=your_testnet_secret_key_here
-   
-   # RSA Authentication (optional)
-   export BINANCE_RSA_API_KEY=your_testnet_rsa_api_key_here
-   export BINANCE_RSA_PRIVATE_KEY_PATH=/path/to/testnet_rsa_private_key.pem
-   
-   # Ed25519 Authentication (optional)
-   export BINANCE_ED25519_API_KEY=your_testnet_ed25519_api_key_here
-   export BINANCE_ED25519_PRIVATE_KEY_PATH=/path/to/testnet_ed25519_private_key.pem
-   ```
-
-3. **Source Environment**:
-   ```bash
-   source env.local
-   ```
-
-## Running Tests
-
-### All Tests
 ```bash
+# from src/binance/go/ws/umfutures
 go test -v
 ```
 
-### Public Endpoints Only
-```bash
-go test -v -run TestTickerPrice
-go test -v -run TestBookTicker
-go test -v -run TestDepth
+`TestFullIntegrationSuite_UmFutures` opens one connection per credential bundle and fans out into subtests:
+
+1. **PublicRequests** – `ticker.price`, `ticker.book`, `depth`
+2. **UserDataRequests_HMAC** – `account.balance`, `account.position`, `account.status`, `v2` equivalents
+3. **TradingRequests_HMAC** – `order.place`, `order.status`, `order.modify`, `order.cancel`
+4. **SessionRequests** – `session.status`, `session.logout`, optional `session.logon` (Ed25519)
+
+Each subtest reuses the same channel, applies conservative throttling, and asserts every field returned by the SDK models.
+
+## Credentials & Environment
+
+The harness reads the following environment variables (see `env.example`):
+
+```
+BINANCE_API_KEY            # HMAC API key (required for authenticated flows)
+BINANCE_SECRET_KEY         # HMAC secret
+BINANCE_RSA_API_KEY        # Optional RSA API key
+BINANCE_RSA_PRIVATE_KEY_PATH
+BINANCE_RSA_PRIVATE_KEY_PASSPHRASE
+BINANCE_ED25519_API_KEY
+BINANCE_ED25519_PRIVATE_KEY_PATH
+BINANCE_ED25519_PRIVATE_KEY_PASSPHRASE
+
+BINANCE_UMFUTURES_WS_SERVER   # Optional WS override (defaults to testnet)
+BINANCE_UMFUTURES_REST_SERVER # Optional REST override for helper calls
+BINANCE_UMFUTURES_SYMBOL      # Optional preferred symbol (comma separated)
+WS_THROTTLE_MS                # Request pacing override (default 300 ms)
+EVENT_WAIT_SECS               # Event wait window (default 20 s)
 ```
 
-### User Data Endpoints
-```bash
-go test -v -run TestAccountBalance
-go test -v -run TestAccountPosition
-go test -v -run TestAccountStatus
-```
+Only the public flow runs without credentials. Trading and user-data tests require HMAC keys; `session.logon` additionally requires an Ed25519 key pair.
 
-### Trading Endpoints
-```bash
-go test -v -run TestOrderPlace
-go test -v -run TestUserDataStream
-```
+## REST Assist
 
-### Specific Authentication Types
-```bash
-# HMAC authentication tests
-go test -v -run "HMAC"
+`rest_helpers_test.go` touches the REST SDK (`github.com/openxapi/binance-go/rest/umfutures`) to:
 
-# Ed25519 authentication tests  
-go test -v -run "Ed25519"
+- Confirm the chosen symbol exists on testnet
+- Fetch current ticker price
+- Derive valid price/quantity pairs that satisfy filters before placing orders
 
-# RSA authentication tests
-go test -v -run "RSA"
-```
+All REST calls target the futures **testnet** (`https://testnet.binancefuture.com`) unless `BINANCE_UMFUTURES_REST_SERVER` overrides it.
 
-### With Extended Timeout
-```bash
-go test -v -timeout 10m
-```
+## Safety Considerations
 
-## Test Configuration
+- The suite only interacts with Binance **testnet** endpoints; no real funds are at risk.
+- WebSocket requests are throttled to stay below rate limits.
+- Every request uses bounded contexts to prevent hangs.
+- On failure the last request payload is logged to simplify triage.
 
-The test suite automatically detects available authentication methods based on environment variables and runs appropriate test combinations:
+## Known Limitations
 
-- **Public-NoAuth**: Tests public endpoints (no credentials needed)
-- **HMAC-UserData**: Tests USER_DATA endpoints with HMAC auth
-- **HMAC-Trade**: Tests TRADE endpoints with HMAC auth
-- **Ed25519-UserData**: Tests USER_DATA endpoints with Ed25519 auth
-- **Ed25519-Trade**: Tests TRADE endpoints with Ed25519 auth
-- **RSA-UserData**: Tests USER_DATA endpoints with RSA auth
-- **RSA-Trade**: Tests TRADE endpoints with RSA auth
+- `session.logon` runs only when Ed25519 credentials are available; the suite skips gracefully otherwise.
+- The AsyncAPI spec omits explicit `LOT_SIZE` metadata, so minimum quantity defaults to reasonable fallbacks (0.001 for BTC pairs).
+- Event handlers are not generated for this channel; only request/response surfaces are covered.
 
-## Safety Features
-
-- **Testnet Only**: All tests use Binance Futures testnet (no real money at risk)
-- **Rate Limiting**: Built-in 2-second delays between requests to prevent IP banning
-- **Timeout Protection**: All requests have timeouts to prevent hanging
-- **Error Handling**: Comprehensive error reporting and handling
-
-## Test Server
-
-- **Endpoint**: `wss://testnet.binancefuture.com/ws-fapi/v1`
-- **Environment**: Binance Futures Testnet
-- **Risk**: No real money - safe for testing
-
-## Common Issues
-
-### Authentication Errors
-- Verify testnet API keys are correct
-- Ensure private key files have proper permissions: `chmod 600 /path/to/key.pem`
-- Check that testnet keys are from https://testnet.binancefuture.com/
-
-### Connection Issues
-- Verify internet connectivity
-- Check if testnet is accessible
-- Ensure no firewall blocking WebSocket connections
-
-### Rate Limiting
-- Tests include built-in rate limiting
-- If you see rate limit errors, increase delays between tests
-
-## Debugging
-
-Enable verbose logging to see detailed test execution:
-
-```bash
-go test -v -run TestOrderPlace 2>&1 | tee test.log
-```
-
-## Notes
-
-- These tests are based on the current umfutures AsyncAPI specification
-- The specification includes basic futures trading functionality
-- Tests validate both request/response handling and authentication
-- All operations are performed on testnet for safety
+Feel free to extend the suite with specialised subtests—`TestFullIntegrationSuite_UmFutures` is the single entry point for continuous validation.
