@@ -34,7 +34,6 @@ src/
         │   ├── spot/          # Spot WebSocket API + User Data Streams
         │   ├── umfutures/     # USD-M Futures WebSocket API + User Data Streams
         │   ├── cmfutures/     # Coin-M Futures WebSocket API + User Data Streams
-        │   ├── options/       # Options WebSocket API + User Data Streams
         │   ├── pmargin/       # Portfolio Margin WebSocket API + User Data Streams
         │   ├── spot-streams/  # Spot Market Data Streams (public data)
         │   ├── umfutures-streams/ # USD-M Futures Market Data Streams (public data)
@@ -96,10 +95,6 @@ go test -v -run TestFullIntegrationSuite ./...
 cd src/binance/go/ws/cmfutures
 go test -v -run TestFullIntegrationSuite ./...
 
-# Options WebSocket API + User Data Streams (3 endpoints, 100% coverage)
-cd src/binance/go/ws/options
-go test -v -run TestFullIntegrationSuite ./...
-
 # Portfolio Margin WebSocket API + User Data Streams (11 event types, limited coverage)
 cd src/binance/go/ws/pmargin
 go test -v -run TestFullIntegrationSuite ./...
@@ -131,6 +126,28 @@ cd src/binance/go/rest/spot
 go test -v -run TestFullIntegrationSuite ./...
 ```
 
+### Makefile Shortcuts (Binance Go WebSocket)
+Use the root `Makefile` to run every Binance Go WebSocket suite at once:
+
+```bash
+# Default: test modules against the locally checked-out ../binance-go workspace
+make test-binance-ws-go
+
+# Test against the remote main branch of github.com/openxapi/binance-go/{ws,rest}
+make test-binance-ws-go BINANCE_WS_GO_SOURCE=main
+
+# Test against the latest (or specific) tag pushed to github.com/openxapi/binance-go
+make test-binance-ws-go BINANCE_WS_GO_SOURCE=tag             # empty BINANCE_WS_GO_TAG => latest tag
+make test-binance-ws-go BINANCE_WS_GO_SOURCE=tag BINANCE_WS_GO_TAG=v0.4.1
+```
+
+`BINANCE_WS_GO_SOURCE` accepts three values:
+- `local` (default): keep using the local `../binance-go` checkout via `replace` directives.
+- `main`: fetch pseudo-versions for the remote `main` branch before testing.
+- `tag`: resolve a commit from the remote `https://github.com/openxapi/binance-go` tags (leave `BINANCE_WS_GO_TAG` empty to auto-pick the highest `vX.Y.Z`, or set it to a specific tag/commit hash).
+
+Remote modes create a temporary `go.mod` (and `go.sum`) by stripping the local `replace` directives, call `scripts/resolve_binance_tag.py` (which shells out to `git ls-remote`) when a tag is requested, execute `go get github.com/openxapi/binance-go/{ws,rest}@<ref>` with `-modfile`, then run the tests with the same temp module file so your working tree stays untouched.
+
 ## Test Categories
 
 ### WebSocket API + User Data Streams Tests
@@ -161,8 +178,8 @@ Tests for traditional HTTP REST APIs:
 ## Test Coverage Summary
 
 ### Binance Go Integration Tests
-- **Total Modules**: 10 (9 WebSocket + 1 REST)
-- **WebSocket API + User Data Streams Modules**: 5 (spot, umfutures, cmfutures, options, pmargin)
+- **Total Modules**: 9 (8 WebSocket + 1 REST)
+- **WebSocket API + User Data Streams Modules**: 4 (spot, umfutures, cmfutures, pmargin)
 - **Market Data Streams Modules**: 4 (spot-streams, umfutures-streams, cmfutures-streams, options-streams)
 - **REST API Modules**: 1 (spot)
 - **Overall Coverage**: Comprehensive across all major Binance trading products

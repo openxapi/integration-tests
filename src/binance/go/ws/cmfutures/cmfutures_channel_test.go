@@ -564,7 +564,7 @@ func validateOrderModifyResponse(t *testing.T, resp *models.OrderModifyResponse,
 	if resp.Result.Symbol != "" && !strings.EqualFold(resp.Result.Symbol, symbol) {
 		t.Errorf("order.modify symbol mismatch: want %s got %s", symbol, resp.Result.Symbol)
 	}
-	if resp.Result.Price != "" && resp.Result.Price != price {
+	if resp.Result.Price != "" && !decimalStringsEqual(resp.Result.Price, price) {
 		t.Errorf("order.modify price mismatch: want %s got %s", price, resp.Result.Price)
 	}
 }
