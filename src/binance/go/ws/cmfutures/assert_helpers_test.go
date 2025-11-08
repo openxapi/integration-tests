@@ -48,3 +48,26 @@ func assertRecentMs(t *testing.T, tsMs int64, within time.Duration, name string)
 		t.Logf("%s diff=%dms (> %v)", name, diff, within)
 	}
 }
+
+func normalizeDecimalString(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if !strings.Contains(value, ".") {
+		return value
+	}
+	value = strings.TrimRight(value, "0")
+	value = strings.TrimRight(value, ".")
+	if value == "" {
+		return "0"
+	}
+	return value
+}
+
+func decimalStringsEqual(a, b string) bool {
+	if a == "" || b == "" {
+		return a == b
+	}
+	return normalizeDecimalString(a) == normalizeDecimalString(b)
+}
